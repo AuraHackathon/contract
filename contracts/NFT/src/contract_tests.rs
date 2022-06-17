@@ -1,3 +1,4 @@
+#[warn(deprecated)]
 use crate::contract::{execute, instantiate, query, reply};
 use crate::contract::{INSTANTIATE_CW721_REPLY_ID, MAX_TOKEN_LIMIT, MAX_TOKEN_PER_BATCH_LIMIT};
 use crate::msg::{ConfigResponse, InstantiateMsg, QueryMsg};
@@ -11,13 +12,13 @@ mod tests {
         mock_dependencies_with_balance, mock_env, mock_info, MOCK_CONTRACT_ADDR,
     };
     use cosmwasm_std::{
-        coins, from_binary, to_binary, Addr, Reply, ReplyOn, SubMsg, SubMsgExecutionResponse,
+        coins, from_binary, to_binary, Addr, Reply, ReplyOn, SubMsg, SubMsgResponse,
         SubMsgResult, WasmMsg,
     };
     // use cw721_base::ExecuteMsg::TransferNft;
 
     use crate::error::ContractError;
-    use crate::msg::ExecuteMsg::{BatchMint, BatchTransferNft, Mint, MintTo, TransferNft};
+    use crate::msg::ExecuteMsg::{BatchMint, BatchTransferNft, Mint, MintTo, TransferNft, SaveBaseTokenURI};
     use crate::Metadata;
     use prost::Message;
 
@@ -239,7 +240,7 @@ mod tests {
         // check query config
         let query_msg = QueryMsg::GetConfig {};
         let res = query(deps.as_ref(), mock_env(), query_msg).unwrap();
-        let config: ConfigResponse = from_binary(&res).unwrap();
+        let _config: ConfigResponse = from_binary(&res).unwrap();
 
         let instantiate_reply = MsgInstantiateContractResponse {
             contract_address: "nftcontract721".to_string(),
@@ -254,13 +255,22 @@ mod tests {
 
         let reply_msg = Reply {
             id: INSTANTIATE_CW721_REPLY_ID,
-            result: SubMsgResult::Ok(SubMsgExecutionResponse {
+            result: SubMsgResult::Ok(SubMsgResponse {
                 events: vec![],
                 data: Some(encoded_instantiate_reply.into()),
             }),
         };
 
         reply(deps.as_mut(), mock_env(), reply_msg).unwrap();
+
+        // call save new base uri
+        let msg_save_base_token_uri = SaveBaseTokenURI{ base_token_uri: "ipfs://1212313".to_string()};
+        let res_execute = execute(deps.as_mut(), mock_env(), info.clone(), msg_save_base_token_uri);
+        assert!(res_execute.is_ok());
+        let query_msg = QueryMsg::GetConfig {};
+        let res = query(deps.as_ref(), mock_env(), query_msg).unwrap();
+        let config: ConfigResponse = from_binary(&res).unwrap();
+        assert_eq!(config.base_token_uri, "ipfs://1212313");
 
         // call mint NFT
         let msg_mint = Mint { token_id: 1 };
