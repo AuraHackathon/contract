@@ -6,8 +6,8 @@ use crate::{Extension, JsonSchema, Metadata};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
-    Reply, ReplyOn, Response, StdResult, SubMsg, WasmMsg,
+    to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order, Reply,
+    ReplyOn, Response, StdResult, SubMsg, WasmMsg,
 };
 use cw2::set_contract_version;
 use cw721_base::{ExecuteMsg as Cw721ExecuteMsg, InstantiateMsg as Cw721InstantiateMsg, MintMsg};
@@ -144,9 +144,9 @@ pub fn execute(
             recipient,
             token_ids,
         } => execute_batch_transfer_nft(deps, info, recipient, token_ids),
-        ExecuteMsg::SaveBaseTokenURI {
-            base_token_uri
-        } => execute_save_base_token_uri(deps, info, base_token_uri)
+        ExecuteMsg::SaveBaseTokenURI { base_token_uri } => {
+            execute_save_base_token_uri(deps, info, base_token_uri)
+        }
     }
 }
 
@@ -199,10 +199,10 @@ pub fn execute_batch_transfer_nft(
 }
 
 pub fn execute_save_base_token_uri(
-    deps:DepsMut,
+    deps: DepsMut,
     info: MessageInfo,
-    base_token_uri: String
-) -> Result<Response, ContractError>{ 
+    base_token_uri: String,
+) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
 
     if info.sender != config.owner {
@@ -449,7 +449,7 @@ fn _execute_batch_transfer_nft(
 
 fn _execute_save_base_token_uri(
     deps: DepsMut,
-    base_token_uri: String
+    base_token_uri: String,
 ) -> Result<Response, ContractError> {
     let mut config = CONFIG.load(deps.storage)?;
     config.base_token_uri = base_token_uri.clone();

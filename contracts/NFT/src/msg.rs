@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr};
+use cosmwasm_std::Addr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -42,10 +42,8 @@ pub enum ExecuteMsg {
         token_ids: Vec<u32>,
     },
 
-    /// Save new base token uri 
-    SaveBaseTokenURI{
-        base_token_uri: String,
-    }
+    /// Save new base token uri
+    SaveBaseTokenURI { base_token_uri: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -167,4 +165,3 @@ pub struct ConfigResponse {
     pub base_token_uri: String,
     pub extension: Extension,
 }
-

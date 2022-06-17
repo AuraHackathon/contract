@@ -213,12 +213,9 @@ mod tests {
                 base_token_uri: String::from(
                     "ipfs://Sdjbfsdkjfgbdkfjgbdsfgbkiufbguydfguybfsdfjkdnsk"
                 ),
-                extension: Some(Metadata {
-                    extension: None,
-                }),
+                extension: Some(Metadata { extension: None }),
             }
         );
-
     }
 
     #[test]

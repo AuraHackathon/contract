@@ -21,7 +21,7 @@ pub struct Trait {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug, Default)]
 pub struct Metadata {
-   pub extension: Option<String>
+    pub extension: Option<String>,
 }
 
 pub type Extension = Option<Metadata>;

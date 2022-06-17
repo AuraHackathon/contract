@@ -1,5 +1,4 @@
-use cosmwasm_std::{ Binary, DepsMut, Env, MessageInfo, Response, Uint128
-};
+use cosmwasm_std::{Binary, DepsMut, Env, MessageInfo, Response, Uint128};
 use cw20::Logo;
 use cw20_base::allowances::{
     execute_burn_from as cw20_burn_from, execute_send_from as cw20_send_from,
@@ -69,7 +68,7 @@ pub fn execute_burn_from(
     info: MessageInfo,
     owner: String,
     amount: Uint128,
-) -> Result<Response, ContractError> { 
+) -> Result<Response, ContractError> {
     cw20_burn_from(deps, env, info, owner, amount)
 }
 
