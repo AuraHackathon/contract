@@ -202,11 +202,10 @@ pub fn execute_save_base_token_uri(
     deps:DepsMut,
     info: MessageInfo,
     base_token_uri: String
-) -> Result<Response, ContractError>{
-    let sender = info.sender.clone(); 
+) -> Result<Response, ContractError>{ 
     let config = CONFIG.load(deps.storage)?;
 
-    if sender != config.owner {
+    if info.sender != config.owner {
         return Err(ContractError::Unauthorized {});
     }
     _execute_save_base_token_uri(deps, base_token_uri)
