@@ -1,0 +1,139 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExecuteMsg",
+  "oneOf": [
+    {
+      "description": "Mint a new NFT",
+      "type": "object",
+      "required": [
+        "mint"
+      ],
+      "properties": {
+        "mint": {
+          "type": "object",
+          "required": [
+            "token_id"
+          ],
+          "properties": {
+            "token_id": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Mint a batch of new NFT",
+      "type": "object",
+      "required": [
+        "batch_mint"
+      ],
+      "properties": {
+        "batch_mint": {
+          "type": "object",
+          "required": [
+            "token_ids"
+          ],
+          "properties": {
+            "token_ids": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Mint a new NFT for recipient specified",
+      "type": "object",
+      "required": [
+        "mint_to"
+      ],
+      "properties": {
+        "mint_to": {
+          "type": "object",
+          "required": [
+            "recipient",
+            "token_id"
+          ],
+          "properties": {
+            "recipient": {
+              "type": "string"
+            },
+            "token_id": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Transfer is a base message to move a token to another account without triggering actions",
+      "type": "object",
+      "required": [
+        "transfer_nft"
+      ],
+      "properties": {
+        "transfer_nft": {
+          "type": "object",
+          "required": [
+            "recipient",
+            "token_id"
+          ],
+          "properties": {
+            "recipient": {
+              "type": "string"
+            },
+            "token_id": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Transfer is a base message to move a batch token to another account without triggering actions",
+      "type": "object",
+      "required": [
+        "batch_transfer_nft"
+      ],
+      "properties": {
+        "batch_transfer_nft": {
+          "type": "object",
+          "required": [
+            "recipient",
+            "token_ids"
+          ],
+          "properties": {
+            "recipient": {
+              "type": "string"
+            },
+            "token_ids": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}
