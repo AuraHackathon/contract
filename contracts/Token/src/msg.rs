@@ -26,4 +26,3 @@ pub struct TokenInitMsg {
     pub agent_contract: String,
     pub marketing: Option<InstantiateMarketingInfo>,
 }
-

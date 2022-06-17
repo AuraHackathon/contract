@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "InstantiateMsg",
+  "type": "object",
+  "required": [
+    "base_token_uri",
+    "cw721_code_id",
+    "max_tokens_per_batch_mint",
+    "max_tokens_per_batch_transfer",
+    "name",
+    "num_tokens",
+    "symbol"
+  ],
+  "properties": {
+    "base_token_uri": {
+      "description": "base_token_uri of NFTs",
+      "type": "string"
+    },
+    "cw721_code_id": {
+      "description": "code id of cw721 was deploy before",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "max_tokens_per_batch_mint": {
+      "description": "max number token of NFTs can be minted a batch",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "max_tokens_per_batch_transfer": {
+      "description": "max number token of NFTs can be transferred a batch",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "name": {
+      "description": "name of NFTs",
+      "type": "string"
+    },
+    "num_tokens": {
+      "description": "number token of NFTs",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "royalty_payment_address": {
+      "description": "royalty addresses",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "royalty_percentage": {
+      "description": "royalty percentage can be received",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "symbol": {
+      "description": "symbol of NFTs",
+      "type": "string"
+    }
+  }
+}
