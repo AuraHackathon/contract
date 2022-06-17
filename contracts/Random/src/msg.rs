@@ -13,7 +13,11 @@ pub enum ExecuteMsg {}
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg<'a> {
-    Random { seed: &'a [u8], entropy: &'a [u8] },
+    Random {
+        seed: &'a [u8],
+        entropy: &'a [u8],
+        round: u64,
+    },
     GetOwner {},
 }
 
