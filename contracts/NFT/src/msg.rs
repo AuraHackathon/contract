@@ -22,6 +22,14 @@ pub struct InstantiateMsg {
     pub name: String,
     /// symbol of NFTs
     pub symbol: String,
+    pub house_max_tokens: u128,
+    pub house_paid_tokens: u128,
+    pub house_minted: u128,
+    pub house_cost_mint: u128,
+    pub building_max_tokens: u128,
+    pub building_paid_tokens: u128,
+    pub building_minted: u128,
+    pub building_cost_mint: u128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
