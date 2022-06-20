@@ -1,6 +1,8 @@
 use crate::error::ContractError;
 use crate::msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{Config, CONFIG, CW721_ADDRESS, MINTABLE_NUM_TOKENS, MINTABLE_TOKEN_IDS};
+use crate::state::{
+    Config, HouseInfo, Model, CONFIG, CW721_ADDRESS, MINTABLE_NUM_TOKENS, MINTABLE_TOKEN_IDS, RandomData,
+};
 use crate::{Deserialize, Serialize};
 use crate::{Extension, JsonSchema, Metadata};
 #[cfg(not(feature = "library"))]
@@ -80,12 +82,60 @@ pub fn instantiate(
         owner: info.sender.clone(),
         cw721_code_id: msg.cw721_code_id,
         cw721_address: None,
+        rand_address: None,
         name: msg.name.clone(),
         symbol: msg.symbol.clone(),
         base_token_uri: msg.base_token_uri.clone(),
         max_tokens: msg.num_tokens,
         max_tokens_per_batch_mint: msg.max_tokens_per_batch_mint,
         max_tokens_per_batch_transfer: msg.max_tokens_per_batch_transfer,
+        house_infos: vec![
+            HouseInfo {
+                model: Model::TREEHOUSE,
+                income_per_day: 12,
+                property_damage: 5,
+            },
+            HouseInfo {
+                model: Model::TRAILERHOUSE,
+                income_per_day: 14,
+                property_damage: 5,
+            },
+            HouseInfo {
+                model: Model::CABIN,
+                income_per_day: 18,
+                property_damage: 5,
+            },
+            HouseInfo {
+                model: Model::ONESTORYHOUSE,
+                income_per_day: 20,
+                property_damage: 10,
+            },
+            HouseInfo {
+                model: Model::TWOSTORYHOUSE,
+                income_per_day: 26,
+                property_damage: 10,
+            },
+            HouseInfo {
+                model: Model::MANSION,
+                income_per_day: 30,
+                property_damage: 15,
+            },
+            HouseInfo {
+                model: Model::PALACE,
+                income_per_day: 37,
+                property_damage: 15,
+            },
+        ],
+        rarities: vec![vec![255, 146, 174, 31, 179, 72, 18]],
+        aliases: vec![vec![0, 0, 0, 1, 1, 2, 3]],
+        house_max_tokens: msg.house_max_tokens,
+        house_paid_tokens: msg.house_paid_tokens,
+        house_minted: msg.house_minted,
+        house_cost_mint: msg.house_cost_mint,
+        building_max_tokens: msg.building_max_tokens,
+        building_paid_tokens: msg.building_paid_tokens,
+        building_minted: msg.building_minted,
+        building_cost_mint: msg.building_cost_mint,
     };
     CONFIG.save(deps.storage, &config)?;
     MINTABLE_NUM_TOKENS.save(deps.storage, &msg.num_tokens)?;
@@ -455,6 +505,23 @@ fn _execute_save_base_token_uri(
     config.base_token_uri = base_token_uri.clone();
     CONFIG.save(deps.storage, &config)?;
     Ok(Response::new().add_attribute("base_token_uri", base_token_uri))
+}
+
+fn _random<'a>(
+    config: &'a Config,
+    mintable_token_id: u32,
+) -> Result<Response, ContractError> {
+    let random_msg = RandomData {
+        seed: mintable_token_id as u8,
+        entropy: mintable_token_id as u8,
+        round: mintable_token_id as u64,
+    };
+    let msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: config.rand_address.as_ref().unwrap().to_string(),
+        msg: to_binary(&random_msg)?,
+        funds: vec![],
+    });
+    Ok(Response::new().add_message(msg))
 }
 
 // Reply callback triggered from cw721 contract instantiation
