@@ -39,6 +39,8 @@ pub enum ExecuteMsg {
     Mint { token_id: u32 },
     /// Mint a batch of new NFT
     BatchMint { token_ids: Vec<u32> },
+    MintHouse { token_ids: Vec<u32> },
+    MintBuilding { token_ids: Vec<u32> },
     /// Mint a new NFT for recipient specified
     MintTo { token_id: u32, recipient: String },
     /// Transfer is a base message to move a token to another account without triggering actions

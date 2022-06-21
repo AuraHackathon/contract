@@ -42,6 +42,12 @@ pub enum ContractError {
 
     #[error("Invalid base token URI (must be an IPFS URI)")]
     InvalidBaseTokenURI {},
+
+    #[error("Invalid mint amount")]
+    InvalidMintAmount {},
+
+    #[error("Invalid payment amount")]
+    InvalidPaymentAmount {},
 }
 
 impl From<ParseError> for ContractError {
