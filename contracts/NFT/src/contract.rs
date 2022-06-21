@@ -1,7 +1,7 @@
 use crate::error::ContractError;
 use crate::msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{
-    Config, HouseInfo, Model, CONFIG, CW721_ADDRESS, MINTABLE_NUM_TOKENS, MINTABLE_TOKEN_IDS, RandomData,
+    Config, HouseInfo, Model, CONFIG, CW721_ADDRESS, MINTABLE_NUM_TOKENS, MINTABLE_TOKEN_IDS, RandomData, MintedId, MINTEDID, HouseBuilding,
 };
 use crate::{Deserialize, Serialize};
 use crate::{Extension, JsonSchema, Metadata};
@@ -9,7 +9,7 @@ use crate::{Extension, JsonSchema, Metadata};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order, Reply,
-    ReplyOn, Response, StdResult, SubMsg, WasmMsg,
+    ReplyOn, Response, StdResult, SubMsg, WasmMsg, Uint128,
 };
 use cw2::set_contract_version;
 use cw721_base::{ExecuteMsg as Cw721ExecuteMsg, InstantiateMsg as Cw721InstantiateMsg, MintMsg};
@@ -137,6 +137,14 @@ pub fn instantiate(
         building_minted: msg.building_minted,
         building_cost_mint: msg.building_cost_mint,
     };
+
+    let minted_id = MintedId {
+        minted: 0,
+        house_minted: 0,
+        building_minted: 0,
+    };
+
+    MINTEDID.save(deps.storage, &minted_id)?;
     CONFIG.save(deps.storage, &config)?;
     MINTABLE_NUM_TOKENS.save(deps.storage, &msg.num_tokens)?;
 
@@ -182,6 +190,8 @@ pub fn execute(
     match msg {
         ExecuteMsg::Mint { token_id } => execute_mint_sender(deps, info, token_id),
         ExecuteMsg::BatchMint { token_ids } => execute_batch_mint_sender(deps, info, token_ids),
+        ExecuteMsg::MintHouse { token_ids } => execute_mint_house(deps, info, token_ids),
+        ExecuteMsg::MintBuilding { token_ids } => execute_batch_mint_sender(deps, info, token_ids),
         ExecuteMsg::MintTo {
             token_id,
             recipient,
@@ -215,6 +225,26 @@ pub fn execute_batch_mint_sender(
     token_ids: Vec<u32>,
 ) -> Result<Response, ContractError> {
     let recipient = info.sender.clone();
+    _execute_batch_mint(deps, info, Some(recipient), token_ids)
+}
+
+pub fn execute_mint_house(
+    deps: DepsMut,
+    info: MessageInfo,
+    token_ids: Vec<u32>,
+) -> Result<Response, ContractError> {
+    let config = CONFIG.load(deps.storage)?;
+    let recipient = info.sender.clone();
+    let amount = info.funds[0].amount;
+    let cost = config.house_cost_mint * (token_ids.len() as u128);
+
+    if Uint128::u128(&amount) <= 0 {
+        return Err(ContractError::InvalidMintAmount {});
+    }
+
+    if Uint128::u128(&amount) < cost {
+        return Err(ContractError::InvalidPaymentAmount {});
+    }
     _execute_batch_mint(deps, info, Some(recipient), token_ids)
 }
 
@@ -294,6 +324,7 @@ fn _execute_batch_mint(
     mut batch_token_ids: Vec<u32>,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
+    let minted_id = MINTEDID.load(deps.storage)?;
 
     let recipient_addr = match recipient {
         Some(some_recipient) => some_recipient,
@@ -315,6 +346,12 @@ fn _execute_batch_mint(
             return Err(ContractError::TokenIdAlreadySold { token_id });
         }
 
+        minted_id.house_minted += 1;
+        minted_id.minted += 1;
+
+        let seed = _random(&config, minted_id.minted as u32);
+        generate(config, minted_id.minted, true, seed);
+
         let msg = _create_cw721_mint(&config, &recipient_addr, token_id);
         let msg_rs = match msg {
             Ok(msg) => msg,
@@ -327,6 +364,7 @@ fn _execute_batch_mint(
         let mintable_num_tokens = MINTABLE_NUM_TOKENS.load(deps.storage)?;
         // Decrement mintable num tokens
         MINTABLE_NUM_TOKENS.save(deps.storage, &(mintable_num_tokens - 1))?;
+        MINTEDID.save(deps.storage, &minted_id);
 
         minted_token_ids.append(&mut vec![token_id]);
         count += 1;
@@ -522,6 +560,32 @@ fn _random<'a>(
         funds: vec![],
     });
     Ok(Response::new().add_message(msg))
+}
+
+fn generate(config: Config, token_id: u128, is_house: bool, seed: u128) -> Result<Response, ContractError> {
+    let t = selectTraits(&config, seed, is_house);
+    // tokenTraits[tokenId] = t;
+}
+
+fn selectTrait(config: Config, seed: u16, traitType: u8) -> u8 {
+    let _trait = u8(seed) % u8(rarities[traitType].length);
+    if (seed >> 8 < rarities[traitType][_trait]) return _trait;
+    return aliases[traitType][_trait];
+}
+
+fn selectTraits(config: Config, seed: u128, isHouse: bool) -> Result<Response, ContractError> {    
+    let t = HouseBuilding {
+        is_house: false,
+        model: 0,
+        image_id: 0
+    };
+
+    seed >>= 16;
+    t.is_house = isHouse;
+    t.model = isHouse ? selectTrait(&config, uint16(seed & 0xFFFF), 0) : 7;
+
+    seed >>= 16;
+    t.imageId = (uint8(seed & 0xFFFF) % IMAGE_NUMBER) + 1;
 }
 
 // Reply callback triggered from cw721 contract instantiation
