@@ -9,7 +9,7 @@ use crate::{Extension, JsonSchema, Metadata};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order, Reply,
-    ReplyOn, Response, StdResult, SubMsg, WasmMsg, Uint128,
+    ReplyOn, Response, StdResult, SubMsg, WasmMsg, Uint128, QueryRequest, WasmQuery,
 };
 use cw2::set_contract_version;
 use cw721_base::{ExecuteMsg as Cw721ExecuteMsg, InstantiateMsg as Cw721InstantiateMsg, MintMsg};
@@ -136,6 +136,7 @@ pub fn instantiate(
         building_paid_tokens: msg.building_paid_tokens,
         building_minted: msg.building_minted,
         building_cost_mint: msg.building_cost_mint,
+        image_number: 256
     };
 
     let minted_id = MintedId {
@@ -324,7 +325,7 @@ fn _execute_batch_mint(
     mut batch_token_ids: Vec<u32>,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
-    let minted_id = MINTEDID.load(deps.storage)?;
+    let mut minted_id = MINTEDID.load(deps.storage)?;
 
     let recipient_addr = match recipient {
         Some(some_recipient) => some_recipient,
@@ -349,8 +350,8 @@ fn _execute_batch_mint(
         minted_id.house_minted += 1;
         minted_id.minted += 1;
 
-        let seed = _random(&config, minted_id.minted as u32);
-        generate(config, minted_id.minted, true, seed);
+        let seed = _random(&deps, &config, minted_id.minted as u32)?;
+        generate(&config, minted_id.minted, true, Uint128::u128(&seed))?;
 
         let msg = _create_cw721_mint(&config, &recipient_addr, token_id);
         let msg_rs = match msg {
@@ -364,7 +365,7 @@ fn _execute_batch_mint(
         let mintable_num_tokens = MINTABLE_NUM_TOKENS.load(deps.storage)?;
         // Decrement mintable num tokens
         MINTABLE_NUM_TOKENS.save(deps.storage, &(mintable_num_tokens - 1))?;
-        MINTEDID.save(deps.storage, &minted_id);
+        MINTEDID.save(deps.storage, &minted_id)?;
 
         minted_token_ids.append(&mut vec![token_id]);
         count += 1;
@@ -546,46 +547,60 @@ fn _execute_save_base_token_uri(
 }
 
 fn _random<'a>(
+    deps: &DepsMut<'_>,
     config: &'a Config,
     mintable_token_id: u32,
-) -> Result<Response, ContractError> {
+) -> StdResult<Uint128> {
     let random_msg = RandomData {
         seed: mintable_token_id as u8,
         entropy: mintable_token_id as u8,
         round: mintable_token_id as u64,
     };
-    let msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: config.rand_address.as_ref().unwrap().to_string(),
-        msg: to_binary(&random_msg)?,
-        funds: vec![],
-    });
-    Ok(Response::new().add_message(msg))
+
+    let seed: u64 =
+        deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+            contract_addr: config.rand_address.as_ref().unwrap().to_string(),
+            msg: to_binary(&random_msg)?,
+        }))?;
+
+    Ok(Uint128::from(seed))
 }
 
-fn generate(config: Config, token_id: u128, is_house: bool, seed: u128) -> Result<Response, ContractError> {
-    let t = selectTraits(&config, seed, is_house);
+fn generate<'a>(config: &'a Config, token_id: u128, is_house: bool, seed: u128) -> Result<Response, ContractError> {
+    let t = select_traits(&config, seed, is_house)?;
     // tokenTraits[tokenId] = t;
+    Ok(Response::new())
 }
 
-fn selectTrait(config: Config, seed: u16, traitType: u8) -> u8 {
-    let _trait = u8(seed) % u8(rarities[traitType].length);
-    if (seed >> 8 < rarities[traitType][_trait]) return _trait;
-    return aliases[traitType][_trait];
-}
-
-fn selectTraits(config: Config, seed: u128, isHouse: bool) -> Result<Response, ContractError> {    
-    let t = HouseBuilding {
+fn select_traits<'a>(config: &'a Config, mut seed: u128, is_house: bool) -> StdResult<HouseBuilding> {    
+    let image_number = config.image_number.clone();
+    let mut t = HouseBuilding {
         is_house: false,
         model: 0,
         image_id: 0
     };
 
     seed >>= 16;
-    t.is_house = isHouse;
-    t.model = isHouse ? selectTrait(&config, uint16(seed & 0xFFFF), 0) : 7;
+    t.is_house = is_house;
+    if is_house {
+        t.model = select_trait(&config, (seed & 0xFFFF) as u16, 0)?;
+    } else {
+        t.model = 7;
+    }
 
     seed >>= 16;
-    t.imageId = (uint8(seed & 0xFFFF) % IMAGE_NUMBER) + 1;
+    t.image_id = ((seed & 0xFFFF) % image_number) + 1;
+
+    Ok(t)
+}
+
+fn select_trait<'a>(config:  &'a Config, seed: u16, trait_type: u8) -> StdResult<u8> {
+    let _trait = (seed as u8) % (config.rarities[trait_type as usize].len() as u8);
+    let model = config.rarities[trait_type as usize][_trait as usize];
+    if seed >> 8 < model as u16 {
+        return Ok(_trait);
+    } 
+    Ok(model)
 }
 
 // Reply callback triggered from cw721 contract instantiation
