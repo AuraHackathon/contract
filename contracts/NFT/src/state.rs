@@ -17,8 +17,8 @@ pub struct Config {
     pub name: String,
     pub symbol: String,
     pub house_infos: Vec<HouseInfo>,
-    pub rarities: Vec<Vec<u128>>,
-    pub aliases: Vec<Vec<u128>>,
+    pub rarities: Vec<Vec<u8>>,
+    pub aliases: Vec<Vec<u8>>,
     pub house_max_tokens: u128,
     pub house_paid_tokens: u128,
     pub house_minted: u128,
@@ -27,6 +27,7 @@ pub struct Config {
     pub building_paid_tokens: u128,
     pub building_minted: u128,
     pub building_cost_mint: u128,
+    pub image_number: u128
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -55,7 +56,7 @@ pub enum Model {
     UTILITYBUILDING,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Copy)]
 pub struct MintedId {
     pub minted: u128,
     pub house_minted: u128,
