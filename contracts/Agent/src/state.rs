@@ -1,45 +1,45 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, Timestamp};
-use cw_storage_plus::{Item, Map};
+use cosmwasm_std::{CanonicalAddr, Uint128, Addr};
+use cw_storage_plus::{ Item, Map};
 
+const CONFIG_KEY: &str = "config";
 const STATE_KEY: &str = "state";
 const STAKED_ACCOUNT_INFOS_KEY: &str = "staked_account_infos";
-const THRESH_HOLD_KEY: &str = "threshold";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub enum DestroyThreshold {
-    LightAir,
-    StrongBreeze,
-    Hurricane,
+pub enum TypeNFT {
+    House,
+    Building
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Histories {
-    pub action: String,
-    pub amount: u128,
-    pub time: Timestamp,
+pub struct Config {
+    pub owner: CanonicalAddr,
+    pub cw721_addr: Option<CanonicalAddr>,
+    pub cw20_addr: Option<CanonicalAddr>,
+    pub rand_addr: Option<CanonicalAddr>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+
 pub struct StakedAccountInfo {
-    pub total_staked_amount: u128,
-    pub pending_rewards: u128,
-    pub last_claim: Timestamp,
-    pub histories: Vec<Histories>,
-    pub destroy_threshold: DestroyThreshold,
+    pub token_id: String,
+    pub owner: CanonicalAddr,
+    pub value: Uint128,
+    pub type_nft: TypeNFT,
+    pub ternant_rating: u8
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
-    pub rand_addr: String,
-    pub cw20_addr: String,
-    pub cw721_address: String,
-    pub owner: Addr,
-    pub start_time: Timestamp,
+    pub tax_rate: u8,
+    pub amount_tax: Uint128,
+    pub unaccounted_reward: Uint128,
+    pub total_building_stake: u16
 }
 
+pub const CONFIG: Item<Config> = Item::new(CONFIG_KEY);
 pub const STATE: Item<State> = Item::new(STATE_KEY);
-pub const STAKED_ACCOUNT_INFOS: Map<&Addr, StakedAccountInfo> = Map::new(STAKED_ACCOUNT_INFOS_KEY);
-pub const THREHOLD: Map<&Addr, u64> = Map::new(THRESH_HOLD_KEY);
+pub const STAKED_ACCOUNT_INFOS: Map<&[u8], Vec<StakedAccountInfo>> = Map::new(STAKED_ACCOUNT_INFOS_KEY);
