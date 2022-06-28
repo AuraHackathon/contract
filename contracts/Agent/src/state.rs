@@ -37,7 +37,14 @@ pub struct State {
     pub tax_rate: u8,
     pub amount_tax: Uint128,
     pub unaccounted_reward: Uint128,
-    pub total_building_stake: u16
+    pub total_building_stake: Uint128
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct RandomData {
+    pub seed: u8,
+    pub entropy: u8,
+    pub round: u64,
 }
 
 pub const CONFIG: Item<Config> = Item::new(CONFIG_KEY);

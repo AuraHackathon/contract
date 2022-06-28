@@ -1,4 +1,4 @@
-use cosmwasm_std::{Timestamp, Addr, Uint128, Uint64, CanonicalAddr};
+use cosmwasm_std::Uint128;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use crate::state::{ TypeNFT };
@@ -9,7 +9,6 @@ pub struct InstantiateMsg {
     pub tax_rate: u8,
     pub amount_tax: Uint128,
     pub unaccounted_reward: Uint128,
-    pub total_building_stake: u16
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

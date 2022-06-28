@@ -1,10 +1,11 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{ to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, from_binary, Uint128, StdError};
-
+use cosmwasm_std::{ to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, 
+    from_binary, Uint128, StdError, QueryRequest, WasmQuery};
 use crate::error::ContractError;
 use crate::msg::{StakedInfoResponse, ExecuteMsg, InstantiateMsg, QueryMsg, Cw721Hook};
 use crate::state::{State, Config, CONFIG, STATE, STAKED_ACCOUNT_INFOS, TypeNFT, StakedAccountInfo};
+use random::msg::QueryMsg as RandomQueryMsg;
 use cw721::{Cw721ReceiveMsg};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -29,7 +30,7 @@ pub fn instantiate(
         tax_rate: msg.tax_rate.clone(),
         amount_tax: msg.amount_tax.clone(),
         unaccounted_reward: msg.unaccounted_reward.clone(),
-        total_building_stake: msg.total_building_stake.clone()
+        total_building_stake: Uint128::zero()
     };
     STATE.save(deps.storage, &state)?;
 
@@ -69,11 +70,18 @@ pub fn handle_stake(deps: DepsMut, env: Env, info: MessageInfo, rcv_msg: Cw721Re
     }
   
     match from_binary(&rcv_msg.msg)? {
-        Cw721Hook::StakeHouse{} => staking_house(deps, env, rcv_msg.token_id, rcv_msg.sender, TypeNFT::House),
-        Cw721Hook::StakeBuiliding{} => staking_building(deps,rcv_msg.token_id, rcv_msg.sender, TypeNFT::Building),
+        Cw721Hook::StakeHouse{} => {
+            staking_house(deps, env, rcv_msg.token_id.clone(), rcv_msg.sender, TypeNFT::House)?;
+        },
+        Cw721Hook::StakeBuiliding{} => {
+            staking_building(deps, rcv_msg.token_id.clone(), rcv_msg.sender, TypeNFT::Building)?;
+        },
     };
 
-    Ok(Response::new().add_attribute("method", "stake"))
+    Ok(Response::new()
+        .add_attribute("method", "stake")
+        .add_attribute("sender", info.sender)
+        .add_attribute("token_id", rcv_msg.token_id))
 }
 pub fn handle_unstake(_deps: DepsMut, _amount: Uint128) -> StdResult<Response> {
 
@@ -91,13 +99,34 @@ pub fn handle_withdraw(_deps: DepsMut) -> StdResult<Response> {
 
 pub(crate) fn staking_house(deps: DepsMut, env: Env, token_id: String, owner: String, type_nft: TypeNFT) -> StdResult<Response>{
     let owner_addr = deps.api.addr_canonicalize(owner.as_str())?;
+    
+    //read random contract address
+    let conf = CONFIG.load(deps.storage)?;
+
+    let raw_random_adrr = if let Some(r) = conf.rand_addr {
+        r
+    } else {
+        return Err(StdError::generic_err("the random contract must have been registered"));
+    };
+
+    let random_addr = deps.api.addr_humanize(&raw_random_adrr)?;
+    let seed: u64 = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart { 
+        contract_addr: random_addr.to_string(), 
+        msg: to_binary(&RandomQueryMsg::Random { 
+            seed: token_id.as_bytes(), 
+            entropy: &env.block.height.to_be_bytes(), 
+            round: env.block.time.seconds()
+        })? 
+    }))?;
+
+    let _random = ((seed % 10) + 1) as u8;
 
     let stake_info = StakedAccountInfo{
         owner: owner_addr.clone(),
         token_id: token_id.clone(),
         value: Uint128::from(env.block.time.seconds()),
         type_nft,
-        ternant_rating: 0u8
+        ternant_rating: _random
     };
     
     let mut staked_account_infos = STAKED_ACCOUNT_INFOS.load(deps.storage, &owner_addr)?;
@@ -116,7 +145,7 @@ pub(crate) fn staking_building(deps: DepsMut, token_id: String, owner: String, t
         token_id: token_id.clone(),
         value:state.amount_tax,
         type_nft,
-        ternant_rating: 0u8
+        ternant_rating: 0
     };
 
     let mut staked_account_infos = STAKED_ACCOUNT_INFOS.load(deps.storage, &owner_addr)?;
