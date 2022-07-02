@@ -4,10 +4,12 @@ use serde::{Deserialize, Serialize};
 
 use cw721_base::msg::QueryMsg as CW721QueryMsg;
 
-use crate::Extension;
+use crate::{Extension, state::Model};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
+    /// base coin denom transfer to contract
+    pub coin_denom: String,
     /// base_token_uri of NFTs
     pub base_token_uri: String,
     /// number token of NFTs
@@ -23,11 +25,9 @@ pub struct InstantiateMsg {
     /// symbol of NFTs
     pub symbol: String,
     pub house_max_tokens: u128,
-    pub house_paid_tokens: u128,
     pub house_minted: u128,
     pub house_cost_mint: u128,
     pub building_max_tokens: u128,
-    pub building_paid_tokens: u128,
     pub building_minted: u128,
     pub building_cost_mint: u128,
 }
@@ -61,6 +61,14 @@ pub enum ExecuteMsg {
 pub enum QueryMsg {
     /// Return config info set in Instantiate
     GetConfig {},
+    /// Return trait of each token
+    GetTokenTrait{ token_id: String},
+    /// Return house info of each nft
+    GetHouseInfo{ token_id: String},
+    /// Return income for each type of house 
+    GetIncomePerDay{ token_id: String},
+    /// Return property damage for each type of house 
+    GetPropertyDamage{ token_id: String},
     /// Return the owner of the given token, error if token does not exist
     /// Return type: OwnerOfResponse
     OwnerOf {
@@ -174,4 +182,19 @@ pub struct ConfigResponse {
     pub symbol: String,
     pub base_token_uri: String,
     pub extension: Extension,
+}
+
+// We define a custom struct for each query response
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct TokenTraitResponse{
+    pub is_house: bool,
+    pub model: u8,
+    pub image_id: u128,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct HouseInfoResponse{
+    pub model: Model,
+    pub income_per_day: u128,
+    pub property_damage: u128,
 }
