@@ -7,6 +7,7 @@ use cw_storage_plus::{Item, Map};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
     pub owner: Addr,
+    pub coin_denom: String,
     pub base_token_uri: String,
     pub max_tokens: u32,
     pub max_tokens_per_batch_mint: u32,
@@ -20,11 +21,9 @@ pub struct Config {
     pub rarities: Vec<Vec<u8>>,
     pub aliases: Vec<Vec<u8>>,
     pub house_max_tokens: u128,
-    pub house_paid_tokens: u128,
     pub house_minted: u128,
     pub house_cost_mint: u128,
     pub building_max_tokens: u128,
-    pub building_paid_tokens: u128,
     pub building_minted: u128,
     pub building_cost_mint: u128,
     pub image_number: u128
@@ -74,5 +73,5 @@ pub const CONFIG: Item<Config> = Item::new("config");
 pub const MINTABLE_TOKEN_IDS: Map<u32, bool> = Map::new("mintable_ids");
 pub const MINTABLE_NUM_TOKENS: Item<u32> = Item::new("mintable_num_tokens");
 pub const CW721_ADDRESS: Item<Addr> = Item::new("cw721_address");
-pub const HOUSEBUILDING: Item<HouseBuilding> = Item::new("house_building");
+pub const HOUSEBUILDING: Map<&str, HouseBuilding> = Map::new("house_building");
 pub const MINTEDID: Item<MintedId> = Item::new("minted_id");

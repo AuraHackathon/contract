@@ -807,6 +807,7 @@ dependencies = [
  "cw721",
  "cw721-base",
  "prost",
+ "random",
  "schemars",
  "serde",
  "thiserror",
