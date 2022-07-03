@@ -1,7 +1,7 @@
 use cosmwasm_std::Uint128;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use crate::state::{ TypeNFT };
+use crate::state::{ TypeNFT, HouseBuilding };
 use cw721::Cw721ReceiveMsg;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -40,14 +40,13 @@ pub enum QueryMsg {
     GetStakedInfo {account: String},
 }
 
-
 // We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct StakedInfoResponse {
     pub token_id: String,
     pub owner: String,
     pub value: Uint128,
-    pub type_nft: TypeNFT,
+    pub type_nft: HouseBuilding,
     pub ternant_rating: u8
 }
 

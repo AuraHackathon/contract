@@ -28,7 +28,7 @@ pub struct StakedAccountInfo {
     pub token_id: String,
     pub owner: CanonicalAddr,
     pub value: Uint128,
-    pub type_nft: TypeNFT,
+    pub type_nft: HouseBuilding,
     pub ternant_rating: u8
 }
 
@@ -47,6 +47,12 @@ pub struct RandomData {
     pub round: u64,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct HouseBuilding {
+    pub is_house: bool,
+    pub model: u8,
+    pub image_id: u128,
+}
 pub const CONFIG: Item<Config> = Item::new(CONFIG_KEY);
 pub const STATE: Item<State> = Item::new(STATE_KEY);
 pub const STAKED_ACCOUNT_INFOS: Map<&[u8], Vec<StakedAccountInfo>> = Map::new(STAKED_ACCOUNT_INFOS_KEY);

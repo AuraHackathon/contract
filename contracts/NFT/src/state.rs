@@ -76,3 +76,4 @@ pub const MINTABLE_NUM_TOKENS: Item<u32> = Item::new("mintable_num_tokens");
 pub const CW721_ADDRESS: Item<Addr> = Item::new("cw721_address");
 pub const HOUSEBUILDING: Item<HouseBuilding> = Item::new("house_building");
 pub const MINTEDID: Item<MintedId> = Item::new("minted_id");
+pub const EXTENSION_NFT: Map<String, HouseBuilding> = Map::new("extension");

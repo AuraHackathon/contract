@@ -3,9 +3,10 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{ to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, 
     from_binary, Uint128, StdError, QueryRequest, WasmQuery};
 use crate::error::ContractError;
-use crate::msg::{StakedInfoResponse, ExecuteMsg, InstantiateMsg, QueryMsg, Cw721Hook};
-use crate::state::{State, Config, CONFIG, STATE, STAKED_ACCOUNT_INFOS, TypeNFT, StakedAccountInfo};
-use random::msg::QueryMsg as RandomQueryMsg;
+use crate::msg::{StakedInfoResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::state::{State, Config, HouseBuilding, CONFIG, STATE, STAKED_ACCOUNT_INFOS, TypeNFT, StakedAccountInfo};
+use random::msg::{QueryMsg as RandomQueryMsg};
+use nft::msg::{QueryMsg as NftInfoQueryMsg};
 use cw721::{Cw721ReceiveMsg};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -68,14 +69,21 @@ pub fn handle_stake(deps: DepsMut, env: Env, info: MessageInfo, rcv_msg: Cw721Re
     if contract_address != cw721_contract_addr {
         return Err(StdError::generic_err("Unauthorize"));
     }
-  
-    match from_binary(&rcv_msg.msg)? {
-        Cw721Hook::StakeHouse{} => {
-            staking_house(deps, env, rcv_msg.token_id.clone(), rcv_msg.sender, TypeNFT::House)?;
-        },
-        Cw721Hook::StakeBuiliding{} => {
-            staking_building(deps, rcv_msg.token_id.clone(), rcv_msg.sender, TypeNFT::Building)?;
-        },
+    
+    let data: HouseBuilding = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart { 
+        contract_addr: cw721_contract_addr.to_string(), 
+        msg: to_binary(&NftInfoQueryMsg::NftInfo { 
+            token_id: rcv_msg.token_id.clone(), 
+        })? 
+    }))?;
+
+
+    if data.is_house {
+     
+            staking_house(deps, env, rcv_msg.token_id.clone(), rcv_msg.sender, data.clone())?;
+    } else {
+       
+            staking_building(deps, rcv_msg.token_id.clone(), rcv_msg.sender, data.clone())?;
     };
 
     Ok(Response::new()
@@ -97,7 +105,7 @@ pub fn handle_withdraw(_deps: DepsMut) -> StdResult<Response> {
     Ok(Response::new().add_attribute("method", "withdraw"))
 }
 
-pub(crate) fn staking_house(deps: DepsMut, env: Env, token_id: String, owner: String, type_nft: TypeNFT) -> StdResult<Response>{
+pub(crate) fn staking_house(deps: DepsMut, env: Env, token_id: String, owner: String, type_nft: HouseBuilding) -> StdResult<Response>{
     let owner_addr = deps.api.addr_canonicalize(owner.as_str())?;
     
     //read random contract address
@@ -125,7 +133,7 @@ pub(crate) fn staking_house(deps: DepsMut, env: Env, token_id: String, owner: St
         owner: owner_addr.clone(),
         token_id: token_id.clone(),
         value: Uint128::from(env.block.time.seconds()),
-        type_nft,
+        type_nft: type_nft,
         ternant_rating: _random
     };
     
@@ -136,7 +144,7 @@ pub(crate) fn staking_house(deps: DepsMut, env: Env, token_id: String, owner: St
     Ok(Response::new().add_attribute("method", "staking_house"))
 }
 
-pub(crate) fn staking_building(deps: DepsMut, token_id: String, owner: String, type_nft: TypeNFT) -> StdResult<Response>{
+pub(crate) fn staking_building(deps: DepsMut, token_id: String, owner: String, type_nft: HouseBuilding) -> StdResult<Response>{
     let owner_addr = deps.api.addr_canonicalize(owner.as_str())?;
 
     let state = STATE.load(deps.storage)?;
@@ -144,7 +152,7 @@ pub(crate) fn staking_building(deps: DepsMut, token_id: String, owner: String, t
         owner: owner_addr.clone(),
         token_id: token_id.clone(),
         value:state.amount_tax,
-        type_nft,
+        type_nft: type_nft,
         ternant_rating: 0
     };
 

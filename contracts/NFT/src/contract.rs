@@ -1,7 +1,7 @@
 use crate::error::ContractError;
 use crate::msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{
-    Config, HouseInfo, Model, CONFIG, CW721_ADDRESS, MINTABLE_NUM_TOKENS, MINTABLE_TOKEN_IDS, RandomData, MintedId, MINTEDID, HouseBuilding,
+    Config, HouseInfo, Model, CONFIG, CW721_ADDRESS, MINTABLE_NUM_TOKENS, EXTENSION_NFT, MINTABLE_TOKEN_IDS, RandomData, MintedId, MINTEDID, HouseBuilding,
 };
 use crate::{Deserialize, Serialize};
 use crate::{Extension, JsonSchema, Metadata};
@@ -296,6 +296,7 @@ pub fn execute_save_base_token_uri(
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetConfig {} => to_binary(&query_config(deps)?),
+        QueryMsg::NftInfo {token_id} => to_binary(&query_nft_info(deps, token_id)?),
         _ => Cw721ArtaverseContract::default().query(deps, env, msg.into()),
     }
 }
@@ -316,6 +317,11 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
             ..Metadata::default()
         }),
     })
+}
+
+fn query_nft_info(deps: Deps, token_id: String) -> StdResult<HouseBuilding> {
+    let nft_info = EXTENSION_NFT.load(deps.storage, token_id.clone())?;
+    Ok(nft_info)
 }
 
 fn _execute_batch_mint(
@@ -351,9 +357,10 @@ fn _execute_batch_mint(
         minted_id.minted += 1;
 
         let seed = _random(&deps, &config, minted_id.minted as u32)?;
-        generate(&config, minted_id.minted, true, Uint128::u128(&seed))?;
-
-        let msg = _create_cw721_mint(&config, &recipient_addr, token_id);
+        let nft_type = generate(&config, true, Uint128::u128(&seed))?;
+        EXTENSION_NFT.save(deps.storage, token_id.clone().to_string(), &nft_type)?;
+        let msg = _create_cw721_mint( &config, &recipient_addr, token_id, nft_type.clone());
+  
         let msg_rs = match msg {
             Ok(msg) => msg,
             Err(ctr_err) => return Err(ctr_err),
@@ -415,9 +422,11 @@ fn _execute_mint(
             mintable_tokens[0]
         }
     };
-
+    let seed = _random(&deps, &config, mintable_token_id.clone() as u32)?;
+    let nft_type = generate(&config, true, Uint128::u128(&seed))?;
+    EXTENSION_NFT.save(deps.storage, mintable_token_id.clone().to_string(), &nft_type)?;
     let mut msgs: Vec<CosmosMsg<Empty>> = vec![];
-    let msg = _create_cw721_mint(&config, &recipient_addr, mintable_token_id);
+    let msg = _create_cw721_mint( &config, &recipient_addr, mintable_token_id, nft_type.clone());
     let msg_rs = match msg {
         Ok(msg) => msg,
         Err(ctr_err) => return Err(ctr_err),
@@ -441,7 +450,9 @@ fn _create_cw721_mint<'a>(
     config: &'a Config,
     recipient_addr: &'a Addr,
     mintable_token_id: u32,
+    type_nft: HouseBuilding
 ) -> Result<CosmosMsg, ContractError> {
+    let ext = format!("`{{`\"is_house\":\"{0}\",\"model\":\"{1}\",\"image_id\":\"{2}\"`}}`", type_nft.is_house, type_nft.model, type_nft.image_id); //{\"action\":\"bet\",\"params\":{\"is_even\":\"true\",\"amount\":10}}
     let mint_msg = Cw721ExecuteMsg::Mint(MintMsg::<Extension> {
         token_id: mintable_token_id.to_string(),
         owner: recipient_addr.to_string(),
@@ -451,7 +462,7 @@ fn _create_cw721_mint<'a>(
             mintable_token_id.clone(),
         )),
         extension: Some(Metadata {
-            ..Metadata::default()
+           extension:Some(ext),
         }),
     });
     let msg = CosmosMsg::Wasm(WasmMsg::Execute {
@@ -566,10 +577,9 @@ fn _random<'a>(
     Ok(Uint128::from(seed))
 }
 
-fn generate<'a>(config: &'a Config, token_id: u128, is_house: bool, seed: u128) -> Result<Response, ContractError> {
+fn generate<'a>(config: &'a Config, is_house: bool, seed: u128) -> StdResult<HouseBuilding> {
     let t = select_traits(&config, seed, is_house)?;
-    // tokenTraits[tokenId] = t;
-    Ok(Response::new())
+    Ok(t) 
 }
 
 fn select_traits<'a>(config: &'a Config, mut seed: u128, is_house: bool) -> StdResult<HouseBuilding> {    
