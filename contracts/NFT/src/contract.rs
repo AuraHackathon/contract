@@ -1,13 +1,15 @@
 use crate::error::ContractError;
 use crate::msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{Config, CONFIG, CW721_ADDRESS, MINTABLE_NUM_TOKENS, MINTABLE_TOKEN_IDS};
+use crate::state::{
+    Config, HouseInfo, Model, CONFIG, CW721_ADDRESS, MINTABLE_NUM_TOKENS, MINTABLE_TOKEN_IDS, RandomData, MintedId, MINTEDID, HouseBuilding,
+};
 use crate::{Deserialize, Serialize};
 use crate::{Extension, JsonSchema, Metadata};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order, Reply,
-    ReplyOn, Response, StdResult, SubMsg, WasmMsg,
+    ReplyOn, Response, StdResult, SubMsg, WasmMsg, Uint128, QueryRequest, WasmQuery,
 };
 use cw2::set_contract_version;
 use cw721_base::{ExecuteMsg as Cw721ExecuteMsg, InstantiateMsg as Cw721InstantiateMsg, MintMsg};
@@ -80,13 +82,70 @@ pub fn instantiate(
         owner: info.sender.clone(),
         cw721_code_id: msg.cw721_code_id,
         cw721_address: None,
+        rand_address: None,
         name: msg.name.clone(),
         symbol: msg.symbol.clone(),
         base_token_uri: msg.base_token_uri.clone(),
         max_tokens: msg.num_tokens,
         max_tokens_per_batch_mint: msg.max_tokens_per_batch_mint,
         max_tokens_per_batch_transfer: msg.max_tokens_per_batch_transfer,
+        house_infos: vec![
+            HouseInfo {
+                model: Model::TREEHOUSE,
+                income_per_day: 12,
+                property_damage: 5,
+            },
+            HouseInfo {
+                model: Model::TRAILERHOUSE,
+                income_per_day: 14,
+                property_damage: 5,
+            },
+            HouseInfo {
+                model: Model::CABIN,
+                income_per_day: 18,
+                property_damage: 5,
+            },
+            HouseInfo {
+                model: Model::ONESTORYHOUSE,
+                income_per_day: 20,
+                property_damage: 10,
+            },
+            HouseInfo {
+                model: Model::TWOSTORYHOUSE,
+                income_per_day: 26,
+                property_damage: 10,
+            },
+            HouseInfo {
+                model: Model::MANSION,
+                income_per_day: 30,
+                property_damage: 15,
+            },
+            HouseInfo {
+                model: Model::PALACE,
+                income_per_day: 37,
+                property_damage: 15,
+            },
+        ],
+        rarities: vec![vec![255, 146, 174, 31, 179, 72, 18]],
+        aliases: vec![vec![0, 0, 0, 1, 1, 2, 3]],
+        house_max_tokens: msg.house_max_tokens,
+        house_paid_tokens: msg.house_paid_tokens,
+        house_minted: msg.house_minted,
+        house_cost_mint: msg.house_cost_mint,
+        building_max_tokens: msg.building_max_tokens,
+        building_paid_tokens: msg.building_paid_tokens,
+        building_minted: msg.building_minted,
+        building_cost_mint: msg.building_cost_mint,
+        image_number: 256
     };
+
+    let minted_id = MintedId {
+        minted: 0,
+        house_minted: 0,
+        building_minted: 0,
+    };
+
+    MINTEDID.save(deps.storage, &minted_id)?;
     CONFIG.save(deps.storage, &config)?;
     MINTABLE_NUM_TOKENS.save(deps.storage, &msg.num_tokens)?;
 
@@ -132,6 +191,8 @@ pub fn execute(
     match msg {
         ExecuteMsg::Mint { token_id } => execute_mint_sender(deps, info, token_id),
         ExecuteMsg::BatchMint { token_ids } => execute_batch_mint_sender(deps, info, token_ids),
+        ExecuteMsg::MintHouse { token_ids } => execute_mint_house(deps, info, token_ids),
+        ExecuteMsg::MintBuilding { token_ids } => execute_batch_mint_sender(deps, info, token_ids),
         ExecuteMsg::MintTo {
             token_id,
             recipient,
@@ -165,6 +226,26 @@ pub fn execute_batch_mint_sender(
     token_ids: Vec<u32>,
 ) -> Result<Response, ContractError> {
     let recipient = info.sender.clone();
+    _execute_batch_mint(deps, info, Some(recipient), token_ids)
+}
+
+pub fn execute_mint_house(
+    deps: DepsMut,
+    info: MessageInfo,
+    token_ids: Vec<u32>,
+) -> Result<Response, ContractError> {
+    let config = CONFIG.load(deps.storage)?;
+    let recipient = info.sender.clone();
+    let amount = info.funds[0].amount;
+    let cost = config.house_cost_mint * (token_ids.len() as u128);
+
+    if Uint128::u128(&amount) <= 0 {
+        return Err(ContractError::InvalidMintAmount {});
+    }
+
+    if Uint128::u128(&amount) < cost {
+        return Err(ContractError::InvalidPaymentAmount {});
+    }
     _execute_batch_mint(deps, info, Some(recipient), token_ids)
 }
 
@@ -244,6 +325,7 @@ fn _execute_batch_mint(
     mut batch_token_ids: Vec<u32>,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
+    let mut minted_id = MINTEDID.load(deps.storage)?;
 
     let recipient_addr = match recipient {
         Some(some_recipient) => some_recipient,
@@ -265,6 +347,12 @@ fn _execute_batch_mint(
             return Err(ContractError::TokenIdAlreadySold { token_id });
         }
 
+        minted_id.house_minted += 1;
+        minted_id.minted += 1;
+
+        let seed = _random(&deps, &config, minted_id.minted as u32)?;
+        generate(&config, minted_id.minted, true, Uint128::u128(&seed))?;
+
         let msg = _create_cw721_mint(&config, &recipient_addr, token_id);
         let msg_rs = match msg {
             Ok(msg) => msg,
@@ -277,6 +365,7 @@ fn _execute_batch_mint(
         let mintable_num_tokens = MINTABLE_NUM_TOKENS.load(deps.storage)?;
         // Decrement mintable num tokens
         MINTABLE_NUM_TOKENS.save(deps.storage, &(mintable_num_tokens - 1))?;
+        MINTEDID.save(deps.storage, &minted_id)?;
 
         minted_token_ids.append(&mut vec![token_id]);
         count += 1;
@@ -455,6 +544,63 @@ fn _execute_save_base_token_uri(
     config.base_token_uri = base_token_uri.clone();
     CONFIG.save(deps.storage, &config)?;
     Ok(Response::new().add_attribute("base_token_uri", base_token_uri))
+}
+
+fn _random<'a>(
+    deps: &DepsMut<'_>,
+    config: &'a Config,
+    mintable_token_id: u32,
+) -> StdResult<Uint128> {
+    let random_msg = RandomData {
+        seed: mintable_token_id as u8,
+        entropy: mintable_token_id as u8,
+        round: mintable_token_id as u64,
+    };
+
+    let seed: u64 =
+        deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+            contract_addr: config.rand_address.as_ref().unwrap().to_string(),
+            msg: to_binary(&random_msg)?,
+        }))?;
+
+    Ok(Uint128::from(seed))
+}
+
+fn generate<'a>(config: &'a Config, token_id: u128, is_house: bool, seed: u128) -> Result<Response, ContractError> {
+    let t = select_traits(&config, seed, is_house)?;
+    // tokenTraits[tokenId] = t;
+    Ok(Response::new())
+}
+
+fn select_traits<'a>(config: &'a Config, mut seed: u128, is_house: bool) -> StdResult<HouseBuilding> {    
+    let image_number = config.image_number.clone();
+    let mut t = HouseBuilding {
+        is_house: false,
+        model: 0,
+        image_id: 0
+    };
+
+    seed >>= 16;
+    t.is_house = is_house;
+    if is_house {
+        t.model = select_trait(&config, (seed & 0xFFFF) as u16, 0)?;
+    } else {
+        t.model = 7;
+    }
+
+    seed >>= 16;
+    t.image_id = ((seed & 0xFFFF) % image_number) + 1;
+
+    Ok(t)
+}
+
+fn select_trait<'a>(config:  &'a Config, seed: u16, trait_type: u8) -> StdResult<u8> {
+    let _trait = (seed as u8) % (config.rarities[trait_type as usize].len() as u8);
+    let model = config.rarities[trait_type as usize][_trait as usize];
+    if seed >> 8 < model as u16 {
+        return Ok(_trait);
+    } 
+    Ok(model)
 }
 
 // Reply callback triggered from cw721 contract instantiation

@@ -22,6 +22,14 @@ pub struct InstantiateMsg {
     pub name: String,
     /// symbol of NFTs
     pub symbol: String,
+    pub house_max_tokens: u128,
+    pub house_paid_tokens: u128,
+    pub house_minted: u128,
+    pub house_cost_mint: u128,
+    pub building_max_tokens: u128,
+    pub building_paid_tokens: u128,
+    pub building_minted: u128,
+    pub building_cost_mint: u128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -31,6 +39,8 @@ pub enum ExecuteMsg {
     Mint { token_id: u32 },
     /// Mint a batch of new NFT
     BatchMint { token_ids: Vec<u32> },
+    MintHouse { token_ids: Vec<u32> },
+    MintBuilding { token_ids: Vec<u32> },
     /// Mint a new NFT for recipient specified
     MintTo { token_id: u32, recipient: String },
     /// Transfer is a base message to move a token to another account without triggering actions
