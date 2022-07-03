@@ -10,6 +10,9 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
+    #[error("Invalid Native Token (require {coin_denom})")]
+    InvalidNativeToken {coin_denom: String},
+
     #[error("Custom Error val: {val:?}")]
     CustomError { val: String },
 
@@ -42,6 +45,18 @@ pub enum ContractError {
 
     #[error("Invalid base token URI (must be an IPFS URI)")]
     InvalidBaseTokenURI {},
+
+    #[error("Invalid mint amount")]
+    InvalidMintAmount {},
+
+    #[error("Invalid payment amount")]
+    InvalidPaymentAmount {},
+
+    #[error("All houses minted")]
+    InvalidAmountHouse {},
+
+    #[error("All building minted")]
+    InvalidAmountBuilding {},
 }
 
 impl From<ParseError> for ContractError {
