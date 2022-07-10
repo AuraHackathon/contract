@@ -15,9 +15,7 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
     ReceiveNft (Cw721ReceiveMsg),
-    Unstake {amount: Uint128},
-    Claim {},
-    Withdraw {},
+    Claim {token_id: String, unstake: bool},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

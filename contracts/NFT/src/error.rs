@@ -11,7 +11,7 @@ pub enum ContractError {
     Unauthorized {},
 
     #[error("Invalid Native Token (require {coin_denom})")]
-    InvalidNativeToken {coin_denom: String},
+    InvalidNativeToken { coin_denom: String },
 
     #[error("Custom Error val: {val:?}")]
     CustomError { val: String },

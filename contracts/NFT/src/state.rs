@@ -26,7 +26,7 @@ pub struct Config {
     pub building_max_tokens: u128,
     pub building_minted: u128,
     pub building_cost_mint: u128,
-    pub image_number: u128
+    pub image_number: u128,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

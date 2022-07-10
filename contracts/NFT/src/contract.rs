@@ -1,22 +1,24 @@
 use crate::error::ContractError;
-use crate::msg::{ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, TokenTraitResponse, HouseInfoResponse};
+use crate::msg::{
+    ConfigResponse, ExecuteMsg, HouseInfoResponse, InstantiateMsg, QueryMsg, TokenTraitResponse,
+};
 use crate::state::{
-    Config, HouseInfo, Model, CONFIG, CW721_ADDRESS, MINTABLE_NUM_TOKENS, 
-    MINTABLE_TOKEN_IDS, RandomData, MintedId, MINTEDID, HouseBuilding, HOUSEBUILDING
+    Config, HouseBuilding, HouseInfo, MintedId, Model, RandomData, CONFIG, CW721_ADDRESS,
+    HOUSEBUILDING, MINTABLE_NUM_TOKENS, MINTABLE_TOKEN_IDS, MINTEDID,
 };
 use crate::{Deserialize, Serialize};
 use crate::{Extension, JsonSchema, Metadata};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order, Reply,
-    ReplyOn, Response, StdResult, SubMsg, WasmMsg, Uint128, QueryRequest, WasmQuery,
+    to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
+    QueryRequest, Reply, ReplyOn, Response, StdResult, SubMsg, Uint128, WasmMsg, WasmQuery,
 };
 use cw2::set_contract_version;
 use cw721_base::{ExecuteMsg as Cw721ExecuteMsg, InstantiateMsg as Cw721InstantiateMsg, MintMsg};
 use cw_utils::parse_reply_instantiate_data;
-use url::Url;
 use random::msg::QueryMsg as RandomQueryMsg;
+use url::Url;
 pub type Cw721ArtaverseContract<'a> = cw721_base::Cw721Contract<'a, Extension, Empty>;
 
 // version info for migration info
@@ -136,7 +138,7 @@ pub fn instantiate(
         building_max_tokens: msg.building_max_tokens,
         building_minted: msg.building_minted,
         building_cost_mint: msg.building_cost_mint,
-        image_number: 256
+        image_number: 256,
     };
 
     let minted_id = MintedId {
@@ -190,9 +192,13 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::Mint { token_id } => execute_mint_sender(deps, info, token_id),
-        ExecuteMsg::BatchMint { token_ids } => execute_batch_mint_sender(deps, _env, info, token_ids),
-        ExecuteMsg::MintHouse { token_ids } => execute_mint_house(deps,_env, info, token_ids),
-        ExecuteMsg::MintBuilding { token_ids } => execute_mint_building(deps,_env, info, token_ids),
+        ExecuteMsg::BatchMint { token_ids } => {
+            execute_batch_mint_sender(deps, _env, info, token_ids)
+        }
+        ExecuteMsg::MintHouse { token_ids } => execute_mint_house(deps, _env, info, token_ids),
+        ExecuteMsg::MintBuilding { token_ids } => {
+            execute_mint_building(deps, _env, info, token_ids)
+        }
         ExecuteMsg::MintTo {
             token_id,
             recipient,
@@ -243,8 +249,10 @@ pub fn execute_mint_house(
     let amount = info.funds[0].amount;
     let cost = config.house_cost_mint * (token_ids.len() as u128);
 
-    if info.funds[0].denom != config.coin_denom{
-        return Err(ContractError::InvalidNativeToken{ coin_denom: config.coin_denom })
+    if info.funds[0].denom != config.coin_denom {
+        return Err(ContractError::InvalidNativeToken {
+            coin_denom: config.coin_denom,
+        });
     }
 
     if Uint128::u128(&amount) <= 0 {
@@ -256,7 +264,7 @@ pub fn execute_mint_house(
     }
 
     if minted_id.house_minted + token_ids.len() as u128 > config.house_max_tokens {
-        return Err(ContractError::InvalidAmountHouse {})
+        return Err(ContractError::InvalidAmountHouse {});
     }
     _execute_batch_mint(deps, _env, info, Some(recipient), true, token_ids)
 }
@@ -274,8 +282,10 @@ pub fn execute_mint_building(
     let amount = info.funds[0].amount;
     let cost = config.house_cost_mint * (token_ids.len() as u128);
 
-    if info.funds[0].denom != config.coin_denom{
-        return Err(ContractError::InvalidNativeToken{ coin_denom: config.coin_denom })
+    if info.funds[0].denom != config.coin_denom {
+        return Err(ContractError::InvalidNativeToken {
+            coin_denom: config.coin_denom,
+        });
     }
 
     if Uint128::u128(&amount) <= 0 {
@@ -287,7 +297,7 @@ pub fn execute_mint_building(
     }
 
     if minted_id.house_minted + token_ids.len() as u128 > config.building_max_tokens {
-        return Err(ContractError::InvalidAmountBuilding {})
+        return Err(ContractError::InvalidAmountBuilding {});
     }
 
     _execute_batch_mint(deps, _env, info, Some(recipient), false, token_ids)
@@ -364,27 +374,27 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     })
 }
 
-fn query_token_trait(deps: Deps, token_id:String) -> StdResult<TokenTraitResponse>{
-    let token_trait = HOUSEBUILDING.load(deps.storage,&token_id)?;
-    return Ok(TokenTraitResponse{
-        is_house:token_trait.is_house,
+fn query_token_trait(deps: Deps, token_id: String) -> StdResult<TokenTraitResponse> {
+    let token_trait = HOUSEBUILDING.load(deps.storage, &token_id)?;
+    return Ok(TokenTraitResponse {
+        is_house: token_trait.is_house,
         model: token_trait.model,
-        image_id: token_trait.image_id
-    })
+        image_id: token_trait.image_id,
+    });
 }
 
-fn query_house_info(deps: Deps, token_id:String) -> StdResult<HouseInfoResponse>{
+fn query_house_info(deps: Deps, token_id: String) -> StdResult<HouseInfoResponse> {
     let config = CONFIG.load(deps.storage)?;
-    let token_trait = HOUSEBUILDING.load(deps.storage,&token_id)?;
+    let token_trait = HOUSEBUILDING.load(deps.storage, &token_id)?;
 
     // get house info by model of token trait
     let house_info = &config.house_infos[token_trait.model as usize];
 
-    return Ok(HouseInfoResponse{
+    return Ok(HouseInfoResponse {
         model: house_info.model.clone(),
         income_per_day: house_info.income_per_day,
-        property_damage: house_info.property_damage
-    })
+        property_damage: house_info.property_damage,
+    });
 }
 
 fn _execute_batch_mint(
@@ -418,16 +428,16 @@ fn _execute_batch_mint(
             return Err(ContractError::TokenIdAlreadySold { token_id });
         }
 
-        if is_house{
+        if is_house {
             minted_id.house_minted += 1;
-        } else{
+        } else {
             minted_id.building_minted += 1;
         }
         minted_id.minted += 1;
 
         //select token trait and store it to mapping
         let seed = _random(&deps, &_env, &config, minted_id.minted as u32)?;
-        let token_traits = select_traits( &config, Uint128::u128(&seed), true)?;
+        let token_traits = select_traits(&config, Uint128::u128(&seed), true)?;
         HOUSEBUILDING.save(deps.storage, &token_id.to_string(), &token_traits)?;
 
         let msg = _create_cw721_mint(&deps, &config, &recipient_addr, token_id);
@@ -633,27 +643,30 @@ fn _random<'a>(
     config: &'a Config,
     mintable_token_id: u32,
 ) -> StdResult<Uint128> {
-    let random_msg = RandomQueryMsg::Random { 
-        seed: &mintable_token_id.to_be_bytes(), 
-        entropy: &_env.block.height.to_be_bytes(), 
-        round: _env.block.time.seconds()
+    let random_msg = RandomQueryMsg::Random {
+        seed: &mintable_token_id.to_be_bytes(),
+        entropy: &_env.block.height.to_be_bytes(),
+        round: _env.block.time.seconds(),
     };
 
-    let seed: u64 =
-        deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-            contract_addr: config.rand_address.as_ref().unwrap().to_string(),
-            msg: to_binary(&random_msg)?,
-        }))?;
+    let seed: u64 = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+        contract_addr: config.rand_address.as_ref().unwrap().to_string(),
+        msg: to_binary(&random_msg)?,
+    }))?;
 
     Ok(Uint128::from(seed))
 }
 
-fn select_traits<'a>(config: &'a Config, mut seed: u128, is_house: bool) -> StdResult<HouseBuilding> {    
+fn select_traits<'a>(
+    config: &'a Config,
+    mut seed: u128,
+    is_house: bool,
+) -> StdResult<HouseBuilding> {
     let image_number = config.image_number.clone();
     let mut t = HouseBuilding {
         is_house: false,
         model: 0,
-        image_id: 0
+        image_id: 0,
     };
 
     seed >>= 16;
@@ -670,12 +683,12 @@ fn select_traits<'a>(config: &'a Config, mut seed: u128, is_house: bool) -> StdR
     Ok(t)
 }
 
-fn select_trait<'a>(config:  &'a Config, seed: u16, trait_type: u8) -> StdResult<u8> {
+fn select_trait<'a>(config: &'a Config, seed: u16, trait_type: u8) -> StdResult<u8> {
     let _trait = (seed as u8) % (config.rarities[trait_type as usize].len() as u8);
     let model = config.rarities[trait_type as usize][_trait as usize];
     if seed >> 8 < model as u16 {
         return Ok(_trait);
-    } 
+    }
     Ok(model)
 }
 
