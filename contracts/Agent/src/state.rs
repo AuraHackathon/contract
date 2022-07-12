@@ -45,6 +45,13 @@ pub struct State {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct HouseBuilding {
+    pub is_house: bool,
+    pub model: u8,
+    pub image_id: u128,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct HouseInfo {
     pub model: Model,
     pub income_per_day: u128,

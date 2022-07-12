@@ -1,12 +1,10 @@
-use std::ops::{Sub};
-
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{attr, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, 
     from_binary, Uint128, StdError, QueryRequest, WasmQuery, WasmMsg, CosmosMsg};
 use crate::error::ContractError;
 use crate::msg::{StakedInfoResponse, ExecuteMsg, InstantiateMsg, QueryMsg, Cw721Hook};
-use crate::state::{State, Config, CONFIG, STATE, STAKED_ACCOUNT_INFOS, TypeNFT, StakedAccountInfo, STAKED_INFOS, TOKEN_LAST_CLAIMED, HouseInfo};
+use crate::state::{State, Config, CONFIG, STATE, STAKED_ACCOUNT_INFOS, TypeNFT, StakedAccountInfo, STAKED_INFOS, TOKEN_LAST_CLAIMED, HouseInfo, HouseBuilding};
 use random::msg::QueryMsg as RandomQueryMsg;
 use cw20::Cw20ExecuteMsg;
 use cw721::{Cw721ReceiveMsg, Cw721ExecuteMsg};
@@ -75,15 +73,18 @@ pub fn handle_stake(deps: DepsMut, env: Env, info: MessageInfo, rcv_msg: Cw721Re
     if contract_address != cw721_contract_addr {
         return Err(StdError::generic_err("Unauthorize"));
     }
+
+    let data: HouseBuilding = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart { 
+        contract_addr: deps.api.addr_humanize(&cw721_contract_addr).unwrap().into_string(), 
+        msg: to_binary(&MinterNFTQueryMsg::GetTokenTrait { token_id: rcv_msg.token_id.clone() })?
+    }))?;
+
+    if data.is_house {
+        staking_house(deps, env, rcv_msg.token_id.clone(), rcv_msg.sender, TypeNFT::House)?;
+    } else {
+        staking_building(deps, rcv_msg.token_id.clone(), rcv_msg.sender, TypeNFT::Building)?;
+    }
    
-    match from_binary(&rcv_msg.msg)? {
-        Cw721Hook::StakeHouse{} => {
-            staking_house(deps, env, rcv_msg.token_id.clone(), rcv_msg.sender, TypeNFT::House)?;
-        },
-        Cw721Hook::StakeBuiliding{} => {
-            staking_building(deps, rcv_msg.token_id.clone(), rcv_msg.sender, TypeNFT::Building)?;
-        },
-    };
 
     Ok(Response::new()
         .add_attribute("method", "stake")
@@ -91,13 +92,33 @@ pub fn handle_stake(deps: DepsMut, env: Env, info: MessageInfo, rcv_msg: Cw721Re
         .add_attribute("token_id", rcv_msg.token_id))
 }
 
-pub fn handle_claim(_deps: DepsMut, _env:Env, info: MessageInfo, token_id:String, unstake: bool) -> StdResult<Response> {
+pub fn handle_claim(mut deps: DepsMut, env:Env, info: MessageInfo, token_id:String, unstake: bool) -> StdResult<Response> {
+    let contract_address = deps.api.addr_canonicalize(info.sender.as_str())?;
+
+    // only token contract can execute this message
+    let conf = CONFIG.load(deps.storage)?;
+
+    let cw721_contract_addr = if let Some(a) = conf.cw721_addr {
+        a
+    } else {
+        return Err(StdError::generic_err("the nft token contract must have been registered"));
+    };
+
+    let data: HouseBuilding = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart { 
+        contract_addr: deps.api.addr_humanize(&cw721_contract_addr).unwrap().into_string(), 
+        msg: to_binary(&MinterNFTQueryMsg::GetTokenTrait { token_id: token_id.clone() })?
+    }))?;
+
+    if data.is_house {
+        claim_house_from_agent(&mut deps, env, info, token_id, unstake)?;
+    } else {
+        claim_building_from_pack(deps, env, info, token_id, unstake)?;   
+    }
 
     Ok(Response::new().add_attribute("method", "unstake"))
 }
 
-
-pub(crate) fn staking_house(deps: DepsMut, env: Env, token_id: String, owner: String, type_nft: TypeNFT) -> StdResult<Response>{
+pub fn staking_house(deps: DepsMut, env: Env, token_id: String, owner: String, type_nft: TypeNFT) -> StdResult<Response>{
     let owner_addr = deps.api.addr_canonicalize(owner.as_str())?;
 
     let conf = CONFIG.load(deps.storage)?;
@@ -150,7 +171,7 @@ pub(crate) fn staking_building(deps: DepsMut, token_id: String, owner: String, t
     let owner_addr = deps.api.addr_canonicalize(owner.as_str())?;
 
     let mut staked_account_infos = STAKED_ACCOUNT_INFOS.load(deps.storage, &owner_addr)?;
-    let mut state = STATE.load(deps.storage)?;
+    let state = STATE.load(deps.storage)?;
 
     //check staked_info not include token_id
     if STAKED_INFOS.has(deps.storage, &token_id){
@@ -213,7 +234,7 @@ pub fn claim_house_from_agent(deps: &mut DepsMut, _env:Env, info:MessageInfo, to
         return Err(StdError::generic_err("Token has not been staked before"))
     }
 
-    if !(unstake && Uint128::from(_env.block.time.seconds()).sub(staked_info.value) < Uint128::from(MINIMUM_TO_EXIT)){
+    if !(unstake && (Uint128::from(_env.block.time.seconds()) - staked_info.value < Uint128::from(MINIMUM_TO_EXIT))){
         return Err(StdError::generic_err("GONNA BE COLD WITHOUT THREE DAY'S CASH"))
     }
 
@@ -258,8 +279,8 @@ pub fn claim_house_from_agent(deps: &mut DepsMut, _env:Env, info:MessageInfo, to
         })? 
         }))?;
 
-        let mut _random = (seed % 100) + 1;
-        if _random > staked_info.ternant_rating as u64 * 10 {
+        let _random = (seed % 100) + 1;
+        if _random > (staked_info.ternant_rating as u64 * 10) {
             pay_building_tax(deps, owed)?;
             owed = Uint128::zero();
         }
@@ -297,19 +318,17 @@ pub fn claim_house_from_agent(deps: &mut DepsMut, _env:Env, info:MessageInfo, to
 
     let res = Response::new()
     .add_messages(messages)
-    .add_attributes(vec![attr("action", "claim")]);
+    .add_attributes(vec![attr("action", "claim_house")]);
     return Ok(res)
 }
 
-pub fn claim_building_from_agent(deps: DepsMut, _env:Env, info:MessageInfo, token_id: String, unstake:bool) -> StdResult<Response>{
-    //use to calculate reward for staker
-    let mut owed: Uint128;
+pub fn claim_building_from_pack(deps: DepsMut, _env:Env, info:MessageInfo, token_id: String, unstake:bool) -> StdResult<Response>{
 
     let owner_addr = deps.api.addr_canonicalize(info.sender.as_str())?;
-
+    
+    // load state of contract
     let config = CONFIG.load(deps.storage)?;
     let mut state = STATE.load(deps.storage)?;
-
     let mut staked_info = STAKED_INFOS.load(deps.storage, &token_id)?;
 
     if owner_addr != staked_info.owner{
@@ -339,14 +358,49 @@ pub fn claim_building_from_agent(deps: DepsMut, _env:Env, info:MessageInfo, toke
         return Err(StdError::generic_err("GONNA BE COLD WITHOUT THREE DAY'S CASH"))
     }
 
-    owed = state.amount_tax - staked_info.value;
+    let owed = state.amount_tax - staked_info.value;
+
+    let mut messages: Vec<CosmosMsg> = vec![];
     if unstake {
+        let mut staked_accounts_info = STAKED_ACCOUNT_INFOS.load(deps.storage, &owner_addr)?;        
+
         state.total_building_staked -= 1;
 
+        //send back house
+        let transfer_cw721_msg = Cw721ExecuteMsg::TransferNft {
+            recipient: deps.api.addr_humanize(&staked_info.owner)?.into_string(),
+            token_id: staked_info.token_id.clone(),
+        };
+        messages.push(CosmosMsg::Wasm(WasmMsg::Execute{
+            contract_addr: deps.api.addr_humanize(&cw721_contract_addr)?.to_string(),
+            msg: to_binary(&transfer_cw721_msg)?,
+            funds: vec![]
+        }));
+
+         //update state
+         staked_accounts_info.remove(staked_accounts_info.iter().position(|x| *x.token_id == token_id).unwrap());
+         STAKED_INFOS.remove(deps.storage, &token_id);
+         STATE.save(deps.storage, &state)?;
+    }else {
+        staked_info.value = state.amount_tax;
     }
 
-    
-    Ok(Response::new())
+    // create transfer cw20 msg
+    let transfer_cw20_msg = Cw20ExecuteMsg::Transfer {
+        recipient: deps.api.addr_humanize(&staked_info.owner)?.into_string(),
+        amount: owed
+    };
+
+    messages.push(CosmosMsg::Wasm(WasmMsg::Execute{
+        contract_addr: deps.api.addr_humanize(&cw20_contract_addr)?.to_string(),
+        msg: to_binary(&transfer_cw20_msg)?,
+        funds: vec![]
+    }));
+
+    let res = Response::new()
+    .add_messages(messages)
+    .add_attributes(vec![attr("action", "claim_building")]);
+    return Ok(res)
 }
 
 pub fn pay_building_tax(deps: &mut DepsMut, amount: Uint128) -> StdResult<()>{
