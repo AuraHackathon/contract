@@ -23,6 +23,7 @@ pub struct Config {
     pub owner: CanonicalAddr,
     pub cw721_addr: Option<CanonicalAddr>,
     pub cw20_addr: Option<CanonicalAddr>,
+    pub minter: Option<CanonicalAddr>,
     pub rand_addr: Option<CanonicalAddr>,
 }
 

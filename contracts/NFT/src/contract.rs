@@ -3,7 +3,7 @@ use crate::msg::{
     ConfigResponse, ExecuteMsg, HouseInfoResponse, InstantiateMsg, QueryMsg, TokenTraitResponse,
 };
 use crate::state::{
-    Config, HouseBuilding, HouseInfo, MintedId, Model, RandomData, CONFIG, CW721_ADDRESS,
+    Config, HouseBuilding, HouseInfo, MintedId, Model, CONFIG, CW721_ADDRESS,
     HOUSEBUILDING, MINTABLE_NUM_TOKENS, MINTABLE_TOKEN_IDS, MINTEDID,
 };
 use crate::{Deserialize, Serialize};
@@ -19,7 +19,7 @@ use cw721_base::{ExecuteMsg as Cw721ExecuteMsg, InstantiateMsg as Cw721Instantia
 use cw_utils::parse_reply_instantiate_data;
 use random::msg::QueryMsg as RandomQueryMsg;
 use url::Url;
-pub type Cw721ArtaverseContract<'a> = cw721_base::Cw721Contract<'a, Extension, Empty>;
+pub type Cw721RentingHouseContract<'a> = cw721_base::Cw721Contract<'a, Extension, Empty>;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:artaverse-contracts";
@@ -352,7 +352,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetConfig {} => to_binary(&query_config(deps)?),
         QueryMsg::GetTokenTrait { token_id } => to_binary(&query_token_trait(deps, token_id)?),
         QueryMsg::GetHouseInfo { token_id } => to_binary(&query_house_info(deps, token_id)?),
-        _ => Cw721ArtaverseContract::default().query(deps, env, msg.into()),
+        _ => Cw721RentingHouseContract::default().query(deps, env, msg.into()),
     }
 }
 
