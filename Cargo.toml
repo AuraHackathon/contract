@@ -1,7 +1,19 @@
 [workspace]
 members = ["contracts/*"]
 
+[profile.release.package.agent]
+codegen-units = 1
+incremental = false
+
 [profile.release.package.nft]
+codegen-units = 1
+incremental = false
+
+[profile.release.package.random]
+codegen-units = 1
+incremental = false
+
+[profile.release.package.token]
 codegen-units = 1
 incremental = false
 

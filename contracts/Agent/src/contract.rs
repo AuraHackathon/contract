@@ -1,6 +1,6 @@
 use crate::error::ContractError;
 use crate::msg::{
-    ConfigResponse, Cw721Hook, ExecuteMsg, InstantiateMsg, QueryMsg, StakedInfoResponse,
+    ConfigResponse, ExecuteMsg, InstantiateMsg, QueryMsg, StakedInfoResponse,
     StateResponse,
 };
 use crate::state::{
@@ -250,7 +250,7 @@ pub fn staking_house(
     Ok(Response::new().add_attribute("method", "staking_house"))
 }
 
-pub(crate) fn staking_building(
+pub fn staking_building(
     deps: DepsMut,
     token_id: String,
     owner: String,
@@ -415,7 +415,11 @@ pub fn claim_house_from_agent(
         );
         STAKED_INFOS.remove(deps.storage, &token_id);
     } else {
+        //save state after claim
         staked_info.value = current_time;
+        
+        STAKED_INFOS.save(deps.storage, &token_id, &staked_info)?;
+        TOKEN_LAST_CLAIMED.save(deps.storage, &token_id, &_env.block.time.seconds())?;
     }
 
     // create transfer cw20 msg
@@ -512,6 +516,9 @@ pub fn claim_building_from_pack(
         STATE.save(deps.storage, &state)?;
     } else {
         staked_info.value = state.amount_tax;
+
+        STAKED_INFOS.save(deps.storage, &token_id, &staked_info)?;
+        TOKEN_LAST_CLAIMED.save(deps.storage, &token_id, &_env.block.time.seconds())?;
     }
 
     // create transfer cw20 msg

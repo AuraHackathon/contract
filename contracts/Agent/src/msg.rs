@@ -1,5 +1,4 @@
 use cosmwasm_std::{Uint128, Addr};
-use cw20::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use crate::state::{ TypeNFT };

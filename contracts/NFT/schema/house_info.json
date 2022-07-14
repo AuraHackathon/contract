@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HouseInfo",
+  "type": "object",
+  "required": [
+    "income_per_day",
+    "model",
+    "property_damage"
+  ],
+  "properties": {
+    "income_per_day": {
+      "type": "integer",
+      "format": "uint128",
+      "minimum": 0.0
+    },
+    "model": {
+      "$ref": "#/definitions/Model"
+    },
+    "property_damage": {
+      "type": "integer",
+      "format": "uint128",
+      "minimum": 0.0
+    }
+  },
+  "definitions": {
+    "Model": {
+      "type": "string",
+      "enum": [
+        "TREEHOUSE",
+        "TRAILERHOUSE",
+        "CABIN",
+        "ONESTORYHOUSE",
+        "TWOSTORYHOUSE",
+        "MANSION",
+        "PALACE",
+        "UTILITYBUILDING"
+      ]
+    }
+  }
+}

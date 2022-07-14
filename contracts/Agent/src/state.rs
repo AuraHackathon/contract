@@ -2,7 +2,7 @@ use nft::state::Model;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{CanonicalAddr, Uint128, Addr};
+use cosmwasm_std::{CanonicalAddr, Uint128};
 use cw_storage_plus::{ Item, Map};
 
 const CONFIG_KEY: &str = "config";
@@ -28,7 +28,6 @@ pub struct Config {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-
 pub struct StakedAccountInfo {
     pub token_id: String,
     pub owner: CanonicalAddr,
@@ -63,4 +62,4 @@ pub const CONFIG: Item<Config> = Item::new(CONFIG_KEY);
 pub const STATE: Item<State> = Item::new(STATE_KEY);
 pub const STAKED_ACCOUNT_INFOS: Map<&[u8], Vec<StakedAccountInfo>> = Map::new(STAKED_ACCOUNT_INFOS_KEY);
 pub const STAKED_INFOS: Map<&str, StakedAccountInfo> = Map::new(STAKED_INFOS_KEY);
-pub const TOKEN_LAST_CLAIMED: Map<&str, Uint128> = Map::new(TOKEN_LAST_CLAIM_KEY);
+pub const TOKEN_LAST_CLAIMED: Map<&str, u64> = Map::new(TOKEN_LAST_CLAIM_KEY);
