@@ -4,7 +4,14 @@
   "type": "object",
   "required": [
     "base_token_uri",
+    "building_cost_mint",
+    "building_max_tokens",
+    "building_minted",
+    "coin_denom",
     "cw721_code_id",
+    "house_cost_mint",
+    "house_max_tokens",
+    "house_minted",
     "max_tokens_per_batch_mint",
     "max_tokens_per_batch_transfer",
     "name",
@@ -16,10 +23,44 @@
       "description": "base_token_uri of NFTs",
       "type": "string"
     },
+    "building_cost_mint": {
+      "type": "integer",
+      "format": "uint128",
+      "minimum": 0.0
+    },
+    "building_max_tokens": {
+      "type": "integer",
+      "format": "uint128",
+      "minimum": 0.0
+    },
+    "building_minted": {
+      "type": "integer",
+      "format": "uint128",
+      "minimum": 0.0
+    },
+    "coin_denom": {
+      "description": "base coin denom transfer to contract",
+      "type": "string"
+    },
     "cw721_code_id": {
       "description": "code id of cw721 was deploy before",
       "type": "integer",
       "format": "uint64",
+      "minimum": 0.0
+    },
+    "house_cost_mint": {
+      "type": "integer",
+      "format": "uint128",
+      "minimum": 0.0
+    },
+    "house_max_tokens": {
+      "type": "integer",
+      "format": "uint128",
+      "minimum": 0.0
+    },
+    "house_minted": {
+      "type": "integer",
+      "format": "uint128",
       "minimum": 0.0
     },
     "max_tokens_per_batch_mint": {
@@ -42,22 +83,6 @@
       "description": "number token of NFTs",
       "type": "integer",
       "format": "uint32",
-      "minimum": 0.0
-    },
-    "royalty_payment_address": {
-      "description": "royalty addresses",
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "royalty_percentage": {
-      "description": "royalty percentage can be received",
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "uint64",
       "minimum": 0.0
     },
     "symbol": {

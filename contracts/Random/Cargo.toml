@@ -39,6 +39,7 @@ cosmwasm-storage = { version = "1.0.0-beta" }
 cw-storage-plus = "0.11"
 cw2 = "0.11"
 schemars = "0.8"
+getrandom = { version = "0.2", features = ["js"] }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0" }
 rand_chacha = "0.3.1"

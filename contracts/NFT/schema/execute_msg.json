@@ -52,6 +52,56 @@
       "additionalProperties": false
     },
     {
+      "type": "object",
+      "required": [
+        "mint_house"
+      ],
+      "properties": {
+        "mint_house": {
+          "type": "object",
+          "required": [
+            "token_ids"
+          ],
+          "properties": {
+            "token_ids": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "mint_building"
+      ],
+      "properties": {
+        "mint_building": {
+          "type": "object",
+          "required": [
+            "token_ids"
+          ],
+          "properties": {
+            "token_ids": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
       "description": "Mint a new NFT for recipient specified",
       "type": "object",
       "required": [
@@ -129,6 +179,27 @@
                 "format": "uint32",
                 "minimum": 0.0
               }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "Save new base token uri",
+      "type": "object",
+      "required": [
+        "save_base_token_u_r_i"
+      ],
+      "properties": {
+        "save_base_token_u_r_i": {
+          "type": "object",
+          "required": [
+            "base_token_uri"
+          ],
+          "properties": {
+            "base_token_uri": {
+              "type": "string"
             }
           }
         }

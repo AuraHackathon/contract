@@ -49,6 +49,8 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0" }
 cw721 = "0.12.0"
 cw721-base = { version = "0.12.0", features = ["library"] }
+getrandom = { version = "0.2", features = ["js"] }
+random = {path = "../Random", features = ["library"] }
 cw-utils = "0.12.1"
 prost = "0.9.0"
 url = "2.2.0"
