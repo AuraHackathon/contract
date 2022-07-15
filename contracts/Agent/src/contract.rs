@@ -11,7 +11,7 @@ use crate::state::{
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, to_binary, Binary, CosmosMsg, Deps, DepsMut, Env,
-    MessageInfo, QueryRequest, Response, StdError, StdResult, Uint128, WasmMsg, WasmQuery,
+    MessageInfo, QueryRequest, Response, StdError, StdResult, WasmMsg, WasmQuery, Uint128
 };
 use cw20::Cw20ExecuteMsg;
 use cw721::{Cw721ExecuteMsg, Cw721ReceiveMsg, OwnerOfResponse};
