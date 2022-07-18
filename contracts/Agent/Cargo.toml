@@ -44,6 +44,7 @@ thiserror = { version = "1.0" }
 cw20 = "0.13.4"
 cw721 = "0.12.0"
 cw721-base = { version = "0.12.0", features = ["library"] }
+getrandom = { version = "0.2.7", features = ["js"] }
 random = {path = "../Random", features = ["library"] }
 nft = {path = "../NFT", features= ["library"]}
 [dev-dependencies]

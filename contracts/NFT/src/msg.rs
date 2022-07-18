@@ -55,16 +55,16 @@ pub enum ExecuteMsg {
         recipient: String,
     },
     /// Transfer is a base message to move a token to another account without triggering actions
-    TransferNft {
-        recipient: String,
-        token_id: u32,
-    },
+    // TransferNft {
+    //     recipient: String,
+    //     token_id: u32,
+    // },
 
-    /// Transfer is a base message to move a batch token to another account without triggering actions
-    BatchTransferNft {
-        recipient: String,
-        token_ids: Vec<u32>,
-    },
+    // /// Transfer is a base message to move a batch token to another account without triggering actions
+    // BatchTransferNft {
+    //     recipient: String,
+    //     token_ids: Vec<u32>,
+    // },
 
     /// Save new base token uri
     SaveBaseTokenURI {
@@ -193,7 +193,6 @@ pub struct ConfigResponse {
     pub cw721_address: Option<Addr>,
     pub max_tokens: u32,
     pub max_tokens_per_mint: u32,
-    pub max_tokens_per_batch_transfer: u32,
     pub name: String,
     pub symbol: String,
     pub base_token_uri: String,

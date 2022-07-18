@@ -65,15 +65,6 @@ pub fn instantiate(
         });
     }
 
-    // Check the number of tokens per batch is more than zero and less than the max limit
-    if msg.max_tokens_per_batch_transfer == 0
-        || msg.max_tokens_per_batch_transfer > MAX_TOKEN_PER_BATCH_LIMIT
-    {
-        return Err(ContractError::InvalidMaxTokensPerBatchTransfer {
-            min: 1,
-            max: MAX_TOKEN_PER_BATCH_LIMIT,
-        });
-    }
 
     // Check that base_token_uri is a valid IPFS uri
     let parsed_token_uri = Url::parse(&msg.base_token_uri)?;
@@ -92,7 +83,6 @@ pub fn instantiate(
         base_token_uri: msg.base_token_uri.clone(),
         max_tokens: msg.num_tokens,
         max_tokens_per_batch_mint: msg.max_tokens_per_batch_mint,
-        max_tokens_per_batch_transfer: msg.max_tokens_per_batch_transfer,
         house_infos: vec![
             HouseInfo {
                 model: Model::TREEHOUSE,
@@ -203,14 +193,6 @@ pub fn execute(
             token_id,
             recipient,
         } => execute_mint_to(deps, info, recipient, token_id),
-        ExecuteMsg::TransferNft {
-            recipient,
-            token_id,
-        } => execute_transfer_nft(deps, info, recipient, token_id),
-        ExecuteMsg::BatchTransferNft {
-            recipient,
-            token_ids,
-        } => execute_batch_transfer_nft(deps, info, recipient, token_ids),
         ExecuteMsg::SaveBaseTokenURI { base_token_uri } => {
             execute_save_base_token_uri(deps, info, base_token_uri)
         }
@@ -313,26 +295,6 @@ pub fn execute_mint_to(
     _execute_mint(deps, info, Some(recipient), Some(token_id))
 }
 
-pub fn execute_transfer_nft(
-    deps: DepsMut,
-    info: MessageInfo,
-    recipient: String,
-    token_id: u32,
-) -> Result<Response, ContractError> {
-    let recipient = deps.api.addr_validate(&recipient)?;
-    _execute_transfer_nft(deps, info, recipient, token_id)
-}
-
-pub fn execute_batch_transfer_nft(
-    deps: DepsMut,
-    info: MessageInfo,
-    recipient: String,
-    token_ids: Vec<u32>,
-) -> Result<Response, ContractError> {
-    let recipient = deps.api.addr_validate(&recipient)?;
-    _execute_batch_transfer_nft(deps, info, recipient, token_ids)
-}
-
 pub fn execute_save_base_token_uri(
     deps: DepsMut,
     info: MessageInfo,
@@ -364,7 +326,6 @@ fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
         cw721_address: config.cw721_address,
         max_tokens: config.max_tokens,
         max_tokens_per_mint: config.max_tokens_per_batch_mint,
-        max_tokens_per_batch_transfer: config.max_tokens_per_batch_transfer,
         name: config.name,
         symbol: config.symbol,
         base_token_uri: config.base_token_uri,
@@ -553,79 +514,6 @@ fn _create_cw721_mint<'a>(
     Ok(msg)
 }
 
-fn _execute_transfer_nft(
-    deps: DepsMut,
-    info: MessageInfo,
-    recipient: Addr,
-    token_id: u32,
-) -> Result<Response, ContractError> {
-    let config = CONFIG.load(deps.storage)?;
-
-    let mut msgs: Vec<CosmosMsg<Empty>> = vec![];
-    let msg = _create_cw721_transfer(&config, &recipient, token_id);
-    let msg_rs = match msg {
-        Ok(msg) => msg,
-        Err(ctr_err) => return Err(ctr_err),
-    };
-    msgs.append(&mut vec![msg_rs]);
-
-    Ok(Response::new()
-        .add_attribute("sender", info.sender)
-        .add_attribute("recipient", recipient)
-        .add_attribute("token_id", token_id.to_string())
-        .add_messages(msgs))
-}
-
-fn _create_cw721_transfer<'a>(
-    config: &'a Config,
-    recipient_addr: &'a Addr,
-    token_id: u32,
-) -> Result<CosmosMsg, ContractError> {
-    let transfer_msg: Cw721ExecuteMsg<Empty> = Cw721ExecuteMsg::TransferNft {
-        recipient: recipient_addr.to_string(),
-        token_id: token_id.to_string(),
-    };
-    let msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: config.cw721_address.as_ref().unwrap().to_string(),
-        msg: to_binary(&transfer_msg)?,
-        funds: vec![],
-    });
-    Ok(msg)
-}
-
-fn _execute_batch_transfer_nft(
-    deps: DepsMut,
-    info: MessageInfo,
-    recipient: Addr,
-    mut batch_token_ids: Vec<u32>,
-) -> Result<Response, ContractError> {
-    let config = CONFIG.load(deps.storage)?;
-
-    let mut msgs: Vec<CosmosMsg<Empty>> = vec![];
-    let mut count: u32 = 0;
-    let mut minted_token_ids: Vec<u32> = vec![];
-    while let Some(token_id) = batch_token_ids.pop() {
-        if count >= config.max_tokens_per_batch_transfer {
-            break;
-        }
-
-        let msg = _create_cw721_transfer(&config, &recipient, token_id);
-        let msg_rs = match msg {
-            Ok(msg) => msg,
-            Err(ctr_err) => return Err(ctr_err),
-        };
-        msgs.append(&mut vec![msg_rs]);
-
-        minted_token_ids.append(&mut vec![token_id]);
-        count += 1;
-    }
-    let transferred_token_ids_str = format!("{:?}", minted_token_ids);
-    Ok(Response::new()
-        .add_attribute("sender", info.sender)
-        .add_attribute("recipient", recipient)
-        .add_attribute("token_id", transferred_token_ids_str)
-        .add_messages(msgs))
-}
 
 fn _execute_save_base_token_uri(
     deps: DepsMut,

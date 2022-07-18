@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use nft::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use nft::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, TokenTraitResponse, HouseInfoResponse};
 use nft::state::{Config, HouseBuilding, HouseInfo, Model};
 
 fn main() {
@@ -19,5 +19,7 @@ fn main() {
     export_schema(&schema_for!(HouseBuilding), &out_dir);
     export_schema(&schema_for!(HouseInfo), &out_dir);
     export_schema(&schema_for!(Model), &out_dir);
+    export_schema(&schema_for!(TokenTraitResponse), &out_dir);
+    export_schema(&schema_for!(HouseInfoResponse), &out_dir);
 
 }
