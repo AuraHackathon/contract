@@ -49,8 +49,13 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0" }
 cw721 = "0.12.0"
 cw721-base = { version = "0.12.0", features = ["library"] }
-getrandom = { version = "0.2", features = ["js"] }
+base64 = "0.12.3"
 random = {path = "../Random", features = ["library"] }
+rand_num = {path = "../../packages/rand_num", default-features = false, version = "0.1.0" }
+rand_chacha = { version = "0.2.2", default-features = false }
+rand_core = { version =  "0.5.1", default-features = false }
+sha2 = { version = "0.10.2", default-features = false}
+rand = "0.7.3"
 cw-utils = "0.12.1"
 prost = "0.9.0"
 url = "2.2.0"

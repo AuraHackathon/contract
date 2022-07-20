@@ -1,23 +1,26 @@
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
+
 use crate::error::ContractError;
 use crate::msg::{
     ConfigResponse, ExecuteMsg, HouseInfoResponse, InstantiateMsg, QueryMsg, TokenTraitResponse,
 };
 use crate::state::{
     Config, HouseBuilding, HouseInfo, MintedId, Model, CONFIG, CW721_ADDRESS,
-    HOUSEBUILDING, MINTABLE_NUM_TOKENS, MINTABLE_TOKEN_IDS, MINTEDID,
+    HOUSEBUILDING, MINTABLE_NUM_TOKENS, MINTABLE_TOKEN_IDS, MINTEDID, PRNG_SEED_KEY,
 };
-use crate::{Deserialize, Serialize};
-use crate::{Extension, JsonSchema, Metadata};
-#[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
+use crate::{Extension, Metadata};
 use cosmwasm_std::{
-    to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order,
-    QueryRequest, Reply, ReplyOn, Response, StdResult, SubMsg, Uint128, WasmMsg, WasmQuery,
+    to_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Order, Reply, ReplyOn, Response, StdResult, SubMsg, Uint128, WasmMsg,
 };
 use cw2::set_contract_version;
 use cw721_base::{ExecuteMsg as Cw721ExecuteMsg, InstantiateMsg as Cw721InstantiateMsg, MintMsg};
 use cw_utils::parse_reply_instantiate_data;
-use random::msg::QueryMsg as RandomQueryMsg;
+use rand_num::{sha_256, Prng};
+
+// For randomization
+use rand::{RngCore, SeedableRng};
+use rand_chacha::ChaChaRng;
 use url::Url;
 pub type Cw721RentingHouseContract<'a> = cw721_base::Cw721Contract<'a, Extension, Empty>;
 
@@ -29,14 +32,6 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) const MAX_TOKEN_LIMIT: u32 = 10000;
 pub(crate) const MAX_TOKEN_PER_BATCH_LIMIT: u32 = 5;
 pub(crate) const INSTANTIATE_CW721_REPLY_ID: u64 = 1;
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct TokensResponse {
-    /// Contains all token_ids in lexicographical ordering
-    /// If there are more than `limit`, use `start_from` in future queries
-    /// to achieve pagination.
-    pub tokens: Vec<String>,
-}
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -71,13 +66,13 @@ pub fn instantiate(
     if parsed_token_uri.scheme() != "ipfs" {
         return Err(ContractError::InvalidBaseTokenURI {});
     }
+    let prng_seed: Vec<u8> = sha_256(base64::encode(msg.entropy).as_bytes()).to_vec(); 
 
     let config = Config {
         owner: info.sender.clone(),
         coin_denom: msg.coin_denom,
         cw721_code_id: msg.cw721_code_id,
         cw721_address: None,
-        rand_address: None,
         name: msg.name.clone(),
         symbol: msg.symbol.clone(),
         base_token_uri: msg.base_token_uri.clone(),
@@ -140,6 +135,7 @@ pub fn instantiate(
     MINTEDID.save(deps.storage, &minted_id)?;
     CONFIG.save(deps.storage, &config)?;
     MINTABLE_NUM_TOKENS.save(deps.storage, &msg.num_tokens)?;
+    PRNG_SEED_KEY.save(deps.storage, &prng_seed)?;
 
     // Save mintable token ids map
     for token_id in 1..=msg.num_tokens {
@@ -360,7 +356,7 @@ fn query_house_info(deps: Deps, token_id: String) -> StdResult<HouseInfoResponse
 
 fn _execute_batch_mint(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     recipient: Option<Addr>,
     is_house: bool,
@@ -397,8 +393,12 @@ fn _execute_batch_mint(
         minted_id.minted += 1;
 
         //select token trait and store it to mapping
-        let seed = _random(&deps, &_env, &config, minted_id.minted as u32)?;
-        let token_traits = select_traits(&config, Uint128::u128(&seed), true)?;
+        let prng_seed: Vec<u8> = PRNG_SEED_KEY.load(deps.storage)?;
+        let random_seed = new_entropy(&info, &env, prng_seed.as_ref(), prng_seed.as_ref());
+        let mut rng = ChaChaRng::from_seed(random_seed);
+        let seed = rng.next_u64() as u128;
+
+        let token_traits = select_traits(&config, seed, true)?;
         HOUSEBUILDING.save(deps.storage, &token_id.to_string(), &token_traits)?;
 
         let msg = _create_cw721_mint(&deps, &config, &recipient_addr, token_id);
@@ -525,24 +525,18 @@ fn _execute_save_base_token_uri(
     Ok(Response::new().add_attribute("base_token_uri", base_token_uri))
 }
 
-fn _random<'a>(
-    deps: &DepsMut<'_>,
-    _env: &Env,
-    config: &'a Config,
-    mintable_token_id: u32,
-) -> StdResult<Uint128> {
-    let random_msg = RandomQueryMsg::Random {
-        seed: &mintable_token_id.to_be_bytes(),
-        entropy: &_env.block.height.to_be_bytes(),
-        round: _env.block.time.seconds(),
-    };
+pub fn new_entropy(info: &MessageInfo, env: &Env, seed: &[u8], entropy: &[u8]) -> [u8; 32] {
+    // 16 here represents the lengths in bytes of the block height and time.
+    let entropy_len = 16 + info.sender.to_string().len() + entropy.len();
+    let mut rng_entropy = Vec::with_capacity(entropy_len);
+    rng_entropy.extend_from_slice(&env.block.height.to_be_bytes());
+    rng_entropy.extend_from_slice(&env.block.time.seconds().to_be_bytes());
+    rng_entropy.extend_from_slice(&info.sender.as_bytes());
+    rng_entropy.extend_from_slice(entropy);
 
-    let seed: u64 = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: config.rand_address.as_ref().unwrap().to_string(),
-        msg: to_binary(&random_msg)?,
-    }))?;
+    let mut rng = Prng::new(seed, &rng_entropy);
 
-    Ok(Uint128::from(seed))
+    rng.rand_bytes()
 }
 
 fn select_traits<'a>(

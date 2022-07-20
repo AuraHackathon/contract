@@ -6,6 +6,7 @@ use cw721::Cw721ReceiveMsg;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
+    pub entropy: String,
     pub tax_rate: u8,
     pub amount_tax: Uint128,
     pub unaccounted_reward: Uint128,
