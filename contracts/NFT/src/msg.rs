@@ -8,6 +8,8 @@ use crate::{state::Model, Extension};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
+    /// entropy use in random
+    pub entropy: String,
     /// base coin denom transfer to contract
     pub coin_denom: String,
     /// base_token_uri of NFTs

@@ -5,7 +5,7 @@ use crate::msg::{
 };
 use crate::state::{
     Config, HouseBuilding, HouseInfo, StakedAccountInfo, State, TypeNFT, CONFIG,
-    STAKED_ACCOUNT_INFOS, STAKED_INFOS, STATE, TOKEN_LAST_CLAIMED,
+    STAKED_ACCOUNT_INFOS, STAKED_INFOS, STATE, TOKEN_LAST_CLAIMED, PRNG_SEED,
 };
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
@@ -16,7 +16,11 @@ use cosmwasm_std::{
 use cw20::Cw20ExecuteMsg;
 use cw721::{Cw721ExecuteMsg, Cw721ReceiveMsg, OwnerOfResponse};
 use nft::msg::QueryMsg as MinterNFTQueryMsg;
-use random::msg::QueryMsg as RandomQueryMsg;
+use rand_num::{sha_256, Prng};
+
+// For randomization
+use rand::{RngCore, SeedableRng};
+use rand_chacha::ChaChaRng;
 
 const MINIMUM_TO_EXIT: u128 = 259200; // 3 days
 const ONE_DAY: u128 = 86400; // 1 day
@@ -32,6 +36,9 @@ pub fn instantiate(
     let sender = info.sender;
     let sndr_raw = deps.api.addr_canonicalize(sender.as_str())?;
 
+    //generate seed to random
+    let prng_seed: Vec<u8> = sha_256(base64::encode(msg.entropy).as_bytes()).to_vec(); 
+
     let config = Config {
         owner: sndr_raw,
         cw721_addr: None,
@@ -39,7 +46,6 @@ pub fn instantiate(
         minter: None,
         rand_addr: None,
     };
-    CONFIG.save(deps.storage, &config)?;
 
     let state = State {
         tax_rate: msg.tax_rate.clone(),
@@ -47,7 +53,11 @@ pub fn instantiate(
         unaccounted_reward: msg.unaccounted_reward.clone(),
         total_building_staked: 0,
     };
+    
+    //Save state
+    CONFIG.save(deps.storage, &config)?;
     STATE.save(deps.storage, &state)?;
+    PRNG_SEED.save(deps.storage, &prng_seed)?;
 
     let res = Response::new();
     Ok(res)
@@ -115,6 +125,7 @@ pub fn handle_stake(
         staking_house(
             deps,
             env,
+            info.clone(),
             rcv_msg.token_id.clone(),
             rcv_msg.sender,
             TypeNFT::House,
@@ -196,39 +207,25 @@ pub fn handle_claim(
 pub fn staking_house(
     deps: DepsMut,
     env: Env,
+    info: MessageInfo,
     token_id: String,
     owner: String,
     type_nft: TypeNFT,
 ) -> StdResult<Response> {
     let owner_addr = deps.api.addr_canonicalize(owner.as_str())?;
 
-    let conf = CONFIG.load(deps.storage)?;
     let mut staked_account_infos = STAKED_ACCOUNT_INFOS.load(deps.storage, &owner_addr)?;
-    // let mut staked_info = STAKED_INFOS.load(deps.storage, &token_id)?;
 
     //check staked_info not include token_id
     if STAKED_INFOS.has(deps.storage, &token_id) {
         return Err(StdError::generic_err("this house has been staked before"));
     }
 
-    //read random contract address
-    let raw_random_adrr = if let Some(r) = conf.rand_addr {
-        r
-    } else {
-        return Err(StdError::generic_err(
-            "the random contract must have been registered",
-        ));
-    };
-
-    let random_addr = deps.api.addr_humanize(&raw_random_adrr)?;
-    let seed: u64 = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: random_addr.to_string(),
-        msg: to_binary(&RandomQueryMsg::Random {
-            seed: token_id.as_bytes(),
-            entropy: &env.block.height.to_be_bytes(),
-            round: env.block.time.seconds(),
-        })?,
-    }))?;
+    //generate seed to get random number
+    let prng_seed: Vec<u8> = PRNG_SEED.load(deps.storage)?;
+    let random_seed = new_entropy(&info, &env, prng_seed.as_ref(), prng_seed.as_ref());
+    let mut rng = ChaChaRng::from_seed(random_seed);
+    let seed = rng.next_u64();
 
     let _random = ((seed % 10) + 1) as u8;
 
@@ -286,7 +283,7 @@ pub fn staking_building(
 
 pub fn claim_house_from_agent(
     deps: &mut DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     token_id: String,
     unstake: bool,
@@ -298,7 +295,7 @@ pub fn claim_house_from_agent(
 
     let config = CONFIG.load(deps.storage)?;
     let mut staked_info = STAKED_INFOS.load(deps.storage, &token_id)?;
-    let current_time = Uint128::from(_env.block.time.seconds());
+    let current_time = Uint128::from(env.block.time.seconds());
 
     let cw721_contract_addr = if let Some(a) = config.cw721_addr {
         a
@@ -316,15 +313,6 @@ pub fn claim_house_from_agent(
         ));
     };
 
-    //read random contract address
-    let raw_random_adrr = if let Some(r) = config.rand_addr {
-        r
-    } else {
-        return Err(StdError::generic_err(
-            "the random contract must have been registered",
-        ));
-    };
-
     if owner_addr != staked_info.owner {
         return Err(StdError::generic_err("Unauthorized"));
     }
@@ -333,9 +321,7 @@ pub fn claim_house_from_agent(
         return Err(StdError::generic_err("Token has not been staked before"));
     }
 
-    if !(unstake
-        && (Uint128::from(_env.block.time.seconds()) - staked_info.value
-            < Uint128::from(MINIMUM_TO_EXIT)))
+    if !(unstake && ((Uint128::from(env.block.time.seconds()) - staked_info.value) < Uint128::from(MINIMUM_TO_EXIT)))
     {
         return Err(StdError::generic_err(
             "GONNA BE COLD WITHOUT THREE DAY'S CASH",
@@ -355,15 +341,11 @@ pub fn claim_house_from_agent(
 
     owed = ((current_time - staked_info.value) * Uint128::from(data.income_per_day)).checked_div(Uint128::from(ONE_DAY))?;
 
-    let random_addr = deps.api.addr_humanize(&raw_random_adrr)?;
-    let seed: u64 = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-        contract_addr: random_addr.to_string(),
-        msg: to_binary(&RandomQueryMsg::Random {
-            seed: token_id.clone().as_bytes(),
-            entropy: &_env.block.height.to_be_bytes(),
-            round: _env.block.time.seconds() + 1,
-        })?,
-    }))?;
+    //select token trait and store it to mapping
+    let prng_seed: Vec<u8> = PRNG_SEED.load(deps.storage)?;
+    let random_seed = new_entropy(&info, &env, prng_seed.as_ref(), prng_seed.as_ref());
+    let mut rng = ChaChaRng::from_seed(random_seed);
+    let seed = rng.next_u64();
 
     let mut _random = (seed % 100) + 1;
 
@@ -372,7 +354,7 @@ pub fn claim_house_from_agent(
     pay_building_tax(deps, tax)?;
     owed -= tax;
 
-    if _random > staked_info.ternant_rating as u64 * 10 {
+    if _random > (staked_info.ternant_rating as u64 * 10) {
         owed = property_damage_tax(owed, Uint128::from(data.property_damage))?;
     }
 
@@ -380,16 +362,13 @@ pub fn claim_house_from_agent(
 
     if unstake {
         let mut staked_accounts_info = STAKED_ACCOUNT_INFOS.load(deps.storage, &owner_addr)?;
-        let seed: u64 = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-            contract_addr: random_addr.to_string(),
-            msg: to_binary(&RandomQueryMsg::Random {
-                seed: token_id.clone().as_bytes(),
-                entropy: &_env.block.height.to_be_bytes(),
-                round: _env.block.time.seconds(),
-            })?,
-        }))?;
 
-        let _random = (seed % 100) + 1;
+        let prng_seed: Vec<u8> = PRNG_SEED.load(deps.storage)?;
+        let random_seed = new_entropy(&info, &env, prng_seed.as_ref(), prng_seed.as_ref());
+        let mut rng = ChaChaRng::from_seed(random_seed);
+        let seed = rng.next_u64();
+
+        _random = (seed % 100) + 1;
         if _random > (staked_info.ternant_rating as u64 * 10) {
             pay_building_tax(deps, owed)?;
             owed = Uint128::zero();
@@ -419,7 +398,7 @@ pub fn claim_house_from_agent(
         staked_info.value = current_time;
         
         STAKED_INFOS.save(deps.storage, &token_id, &staked_info)?;
-        TOKEN_LAST_CLAIMED.save(deps.storage, &token_id, &_env.block.time.seconds())?;
+        TOKEN_LAST_CLAIMED.save(deps.storage, &token_id, &env.block.time.seconds())?;
     }
 
     // create transfer cw20 msg
@@ -442,7 +421,7 @@ pub fn claim_house_from_agent(
 
 pub fn claim_building_from_pack(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     token_id: String,
     unstake: bool,
@@ -480,7 +459,7 @@ pub fn claim_building_from_pack(
         return Err(StdError::generic_err("Token has not been staked before"));
     }
 
-    if !(unstake&& Uint128::from(_env.block.time.seconds()) - staked_info.value < Uint128::from(MINIMUM_TO_EXIT)){
+    if !(unstake && ((Uint128::from(env.block.time.seconds()) - staked_info.value) < Uint128::from(MINIMUM_TO_EXIT))){
         return Err(StdError::generic_err(
             "GONNA BE COLD WITHOUT THREE DAY'S CASH",
         ));
@@ -518,7 +497,7 @@ pub fn claim_building_from_pack(
         staked_info.value = state.amount_tax;
 
         STAKED_INFOS.save(deps.storage, &token_id, &staked_info)?;
-        TOKEN_LAST_CLAIMED.save(deps.storage, &token_id, &_env.block.time.seconds())?;
+        TOKEN_LAST_CLAIMED.save(deps.storage, &token_id, &env.block.time.seconds())?;
     }
 
     // create transfer cw20 msg
@@ -557,6 +536,20 @@ pub fn pay_building_tax(deps: &mut DepsMut, amount: Uint128) -> StdResult<()> {
 
 pub fn property_damage_tax(amount: Uint128, property_damage: Uint128) -> StdResult<Uint128> {
     return Ok((amount * (Uint128::from(100u128) - property_damage)).checked_div(Uint128::from(100u128))?);
+}
+
+pub fn new_entropy(info: &MessageInfo, env: &Env, seed: &[u8], entropy: &[u8]) -> [u8; 32] {
+    // 16 here represents the lengths in bytes of the block height and time.
+    let entropy_len = 16 + info.sender.to_string().len() + entropy.len();
+    let mut rng_entropy = Vec::with_capacity(entropy_len);
+    rng_entropy.extend_from_slice(&env.block.height.to_be_bytes());
+    rng_entropy.extend_from_slice(&env.block.time.seconds().to_be_bytes());
+    rng_entropy.extend_from_slice(&info.sender.as_bytes());
+    rng_entropy.extend_from_slice(entropy);
+
+    let mut rng = Prng::new(seed, &rng_entropy);
+
+    rng.rand_bytes()
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

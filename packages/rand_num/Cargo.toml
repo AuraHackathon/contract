@@ -1,14 +1,8 @@
 [package]
-name = "agent"
+name = "rand_num"
 version = "0.1.0"
 authors = ["prunfinance <prunfinance@gmail.com>"]
 edition = "2018"
-
-exclude = [
-  # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
-  "contract.wasm",
-  "hash.txt",
-]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -34,23 +28,12 @@ library = []
 
 
 [dependencies]
-cosmwasm-std = { version = "1.0.0" }
-cosmwasm-storage = { version = "1.0.0" }
-cw-storage-plus = "0.13"
-cw2 = "0.11"
-schemars = "0.8"
-serde = { version = "1.0", default-features = false, features = ["derive"] }
-thiserror = { version = "1.0" }
-cw20 = "0.13.4"
-cw721 = "0.12.0"
-cw721-base = { version = "0.12.0", features = ["library"] }
-rand_num = {path = "../../packages/rand_num", default-features = false, version = "0.1.0" }
-base64 = "0.12.3"
+cosmwasm-std = { version = "1.0.0-beta" }
 rand_chacha = { version = "0.2.2", default-features = false }
 rand_core = { version =  "0.5.1", default-features = false }
 sha2 = { version = "0.10.2", default-features = false}
-rand = "0.7.3"
-random = {path = "../Random", features = ["library"] }
-nft = {path = "../NFT", features= ["library"]}
+
+
+
 [dev-dependencies]
 cosmwasm-schema = { version = "1.0.0-beta" }
